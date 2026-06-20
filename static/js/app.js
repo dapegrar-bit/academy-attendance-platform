@@ -33,10 +33,69 @@ function initLiveNotifications(){
   let lastId = parseInt(localStorage.getItem(storageKey) || '0', 10) || 0;
   let polling = false;
 
+  const instantPanel = document.createElement('div');
+  instantPanel.id = 'instant-checkin-panel';
+  instantPanel.className = 'instant-checkin-panel';
+  document.body.appendChild(instantPanel);
+
+  function checkIn(url){
+    if(!url) return;
+    fetch(url, {
+      method: 'POST',
+      headers: {'X-CSRFToken': getCookie('csrftoken')},
+      credentials: 'same-origin',
+      cache: 'no-store'
+    })
+      .then(function(){ window.location.href = '/panel/trainee/'; })
+      .catch(function(){ window.location.href = url; });
+  }
+
+  function renderInstantPanel(items){
+    if(!Array.isArray(items) || !items.length){
+      instantPanel.classList.remove('show');
+      instantPanel.innerHTML = '';
+      return;
+    }
+    instantPanel.innerHTML = `
+      <div class="instant-checkin-card">
+        <div class="instant-checkin-head">
+          <span class="instant-checkin-icon">⚡</span>
+          <div>
+            <strong>حضور فجائي متاح الآن</strong>
+            <p>اضغطي على زر التحضير لتسجيل حضورك فورًا.</p>
+          </div>
+        </div>
+        <div class="instant-checkin-list"></div>
+      </div>
+    `;
+    const list = instantPanel.querySelector('.instant-checkin-list');
+    items.forEach(function(item){
+      const row = document.createElement('div');
+      row.className = 'instant-checkin-row';
+      row.innerHTML = `
+        <div>
+          <strong>${escapeHtml(item.title || 'محاضرة')}</strong>
+          <small>${escapeHtml(item.date || '')}${item.time ? ' • ' + escapeHtml(item.time) : ''}</small>
+        </div>
+        <button type="button" class="instant-circle-action" data-checkin-url="${escapeHtml(item.checkin_url || '')}">تحضير الآن</button>
+      `;
+      list.appendChild(row);
+    });
+    instantPanel.querySelectorAll('[data-checkin-url]').forEach(function(btn){
+      btn.addEventListener('click', function(){
+        btn.disabled = true;
+        btn.textContent = 'جاري التسجيل...';
+        checkIn(btn.dataset.checkinUrl);
+      });
+    });
+    instantPanel.classList.add('show');
+  }
+
   function showNotification(item){
     const card = document.createElement('div');
     card.className = 'live-notification-card';
     card.dataset.notificationId = item.id;
+    const actionHtml = item.checkin_url ? `<button type="button" class="live-checkin-btn" data-checkin-url="${escapeHtml(item.checkin_url)}">⚡ تحضير فجائي الآن</button>` : '';
     card.innerHTML = `
       <button type="button" class="live-notification-close" aria-label="إغلاق">×</button>
       <div class="live-notification-icon">🔔</div>
@@ -44,9 +103,19 @@ function initLiveNotifications(){
         <strong>${escapeHtml(item.title || 'تنبيه جديد')}</strong>
         <p>${escapeHtml(item.body || '')}</p>
         <small>${escapeHtml(item.created_at || '')}${item.session ? ' • ' + escapeHtml(item.session) : ''}</small>
+        ${actionHtml}
       </div>
     `;
     stack.prepend(card);
+
+    const action = card.querySelector('.live-checkin-btn');
+    if(action){
+      action.addEventListener('click', function(){
+        action.disabled = true;
+        action.textContent = 'جاري التسجيل...';
+        checkIn(action.dataset.checkinUrl);
+      });
+    }
 
     const close = card.querySelector('.live-notification-close');
     close.addEventListener('click', function(){
@@ -60,7 +129,7 @@ function initLiveNotifications(){
         card.classList.add('hide');
         setTimeout(()=>card.remove(), 250);
       }
-    }, 14000);
+    }, 18000);
   }
 
   function escapeHtml(value){
@@ -90,7 +159,9 @@ function initLiveNotifications(){
     fetch(url.toString(), {credentials: 'same-origin', cache: 'no-store'})
       .then(res => res.ok ? res.json() : null)
       .then(data => {
-        if(!data || !Array.isArray(data.notifications)) return;
+        if(!data) return;
+        renderInstantPanel(data.open_checkins || []);
+        if(!Array.isArray(data.notifications)) return;
         const deliveredIds = [];
         data.notifications.forEach(item => {
           if(item.id && item.id > lastId){
@@ -102,7 +173,6 @@ function initLiveNotifications(){
             showNotification(item);
           }
         });
-        // نعلّم التنبيهات كمقروءة بعد وصولها للمتدرب حتى لا تتكرر كل مرة.
         if(deliveredIds.length){
           setTimeout(()=>markRead(deliveredIds), 1200);
         }
@@ -111,8 +181,7 @@ function initLiveNotifications(){
       .finally(()=>{ polling = false; });
   }
 
-  // أول فحص بعد فتح الصفحة، ثم فحص خفيف كل 5 ثوانٍ بدون إعادة تحميل الصفحة.
-  setTimeout(poll, 1200);
+  setTimeout(poll, 900);
   setInterval(poll, 5000);
 
   document.addEventListener('visibilitychange', function(){

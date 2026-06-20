@@ -17,6 +17,7 @@ from django.db import transaction
 from django.db.models import Q
 from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
+from django.urls import reverse
 from django.utils import timezone
 
 from .forms import (
@@ -583,12 +584,13 @@ def admin_settings(request):
 
 @login_required
 def poll_notifications(request):
-    """واجهة خفيفة لتحديث تنبيهات المتدرب في الخلفية دون إعادة تحميل الصفحة."""
+    """واجهة خفيفة لتحديث تنبيهات المتدرب وأزرار الحضور الفجائي في الخلفية دون إعادة تحميل الصفحة."""
     if request.user.is_staff:
-        return JsonResponse({'unread_count': 0, 'notifications': []})
+        return JsonResponse({'unread_count': 0, 'notifications': [], 'open_checkins': []})
 
+    profile = get_profile(request.user)
     last_id = request.GET.get('last_id')
-    qs = Notification.objects.filter(recipient=request.user).order_by('-created_at')
+    qs = Notification.objects.filter(recipient=request.user).select_related('session').order_by('-created_at')
     unread_count = qs.filter(is_read=False).count()
 
     if last_id and str(last_id).isdigit():
@@ -596,22 +598,48 @@ def poll_notifications(request):
     else:
         qs = qs.filter(is_read=False)
 
+    attended_ids = set(AttendanceRecord.objects.filter(trainee=profile).values_list('session_id', flat=True))
+
     items = []
     for n in qs.order_by('created_at')[:10]:
+        checkin_url = ''
+        can_checkin = False
+        if n.session and n.session.batch_id == profile.batch_id and n.session_id not in attended_ids and n.session.checkin_is_open:
+            can_checkin = True
+            checkin_url = reverse('check_in', args=[n.session_id])
         items.append({
             'id': n.id,
             'title': n.title,
             'body': n.body,
             'created_at': timezone.localtime(n.created_at).strftime('%Y-%m-%d %H:%M'),
             'session': n.session.title if n.session else '',
+            'can_checkin': can_checkin,
+            'checkin_url': checkin_url,
         })
+
+    open_checkins = []
+    if profile.batch_id:
+        instant_sessions = (
+            Session.objects.filter(batch=profile.batch, is_active=True, instant_checkin_enabled=True)
+            .exclude(attendance_records__trainee=profile)
+            .order_by('date', 'start_time', 'id')[:8]
+        )
+        for session in instant_sessions:
+            open_checkins.append({
+                'id': session.id,
+                'title': session.title,
+                'date': session.date.strftime('%Y-%m-%d'),
+                'time': session.start_time.strftime('%H:%M') if session.start_time else '',
+                'message': session.checkin_message,
+                'checkin_url': reverse('check_in', args=[session.id]),
+            })
 
     return JsonResponse({
         'unread_count': unread_count,
         'notifications': items,
+        'open_checkins': open_checkins,
         'server_time': timezone.now().isoformat(),
     })
-
 
 @login_required
 def mark_notifications_read(request):
@@ -638,8 +666,10 @@ def trainee_home(request):
     today_session_rows = []
     if profile.batch:
         todays_sessions = list(
-            Session.objects.filter(batch=profile.batch, date=today, is_active=True)
-            .order_by('start_time', 'id')
+            Session.objects.filter(batch=profile.batch, is_active=True)
+            .filter(Q(date=today) | Q(instant_checkin_enabled=True))
+            .distinct()
+            .order_by('date', 'start_time', 'id')
         )
 
     if todays_sessions:

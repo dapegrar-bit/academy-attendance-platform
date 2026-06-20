@@ -217,3 +217,53 @@ body, button, input, select, textarea{font-family:'Cairo','Segoe UI',Tahoma,Gene
 @media(max-width:560px){
   .attendance-circle-btn{width:126px;height:126px;font-size:18px}
 }
+
+
+/* أيقونة حضور فجائي واضحة للمتدربين */
+.instant-checkin-panel{
+  position:fixed;
+  right:255px;
+  bottom:24px;
+  z-index:9998;
+  width:min(430px, calc(100vw - 32px));
+  display:none;
+}
+.instant-checkin-panel.show{display:block;animation:liveNoticeIn .25s ease-out both}
+.instant-checkin-card{
+  padding:18px;
+  border-radius:24px;
+  border:1px solid rgba(242,189,58,.45);
+  background:linear-gradient(135deg, rgba(15,42,31,.98), rgba(58,48,16,.96));
+  box-shadow:0 22px 55px rgba(0,0,0,.45);
+}
+.instant-checkin-head{display:flex;align-items:center;gap:12px;margin-bottom:14px}
+.instant-checkin-icon{
+  width:48px;height:48px;border-radius:50%;display:grid;place-items:center;
+  background:rgba(242,189,58,.20);border:1px solid rgba(242,189,58,.45);font-size:23px;
+}
+.instant-checkin-head strong{display:block;font-size:17px;font-weight:900;color:#fff7d9}
+.instant-checkin-head p{margin:4px 0 0;color:#d7cda4;font-size:13px}
+.instant-checkin-list{display:grid;gap:10px}
+.instant-checkin-row{
+  display:grid;grid-template-columns:1fr auto;align-items:center;gap:12px;
+  padding:12px;border-radius:18px;background:rgba(4,17,13,.48);border:1px solid rgba(255,255,255,.08);
+}
+.instant-checkin-row strong{display:block;font-size:14px;color:#f7fffb}
+.instant-checkin-row small{display:block;color:#9fc7bb;margin-top:4px}
+.instant-circle-action,
+.live-checkin-btn{
+  border:0;cursor:pointer;font-family:inherit;font-weight:900;color:#082018;
+  background:linear-gradient(135deg,#f2bd3a,#ffe48a);
+  box-shadow:0 12px 28px rgba(242,189,58,.22);
+}
+.instant-circle-action{
+  width:92px;height:92px;border-radius:50%;display:grid;place-items:center;text-align:center;line-height:1.45;padding:10px;
+  position:relative;
+}
+.instant-circle-action::before,.instant-circle-action::after{
+  content:"";position:absolute;border-radius:50%;border:2px solid rgba(242,189,58,.35);inset:-8px;animation:academyCirclePulse 1.8s infinite;
+}
+.instant-circle-action::after{inset:-18px;animation-delay:.5s}
+.live-checkin-btn{margin-top:10px;border-radius:999px;padding:10px 14px;display:inline-flex;align-items:center;justify-content:center;gap:7px}
+.instant-circle-action:disabled,.live-checkin-btn:disabled{opacity:.65;cursor:wait;animation:none}
+@media(max-width:1050px){.instant-checkin-panel{right:16px;left:16px;bottom:16px;width:auto}.instant-checkin-row{grid-template-columns:1fr}.instant-circle-action{justify-self:center}}
