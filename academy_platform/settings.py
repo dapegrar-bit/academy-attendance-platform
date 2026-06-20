@@ -60,16 +60,36 @@ TEMPLATES = [
 WSGI_APPLICATION = 'academy_platform.wsgi.application'
 ASGI_APPLICATION = 'academy_platform.asgi.application'
 
-DATABASE_URL = os.environ.get('DATABASE_URL')
+# قاعدة البيانات
+# محليًا: يستخدم SQLite للتجربة فقط.
+# على Render/السيرفر: يجب استخدام PostgreSQL عبر DATABASE_URL حتى لا تضيع البيانات عند إعادة التشغيل أو النشر.
+from django.core.exceptions import ImproperlyConfigured
+
+DATABASE_URL = os.environ.get('DATABASE_URL', '').strip()
+REQUIRE_DATABASE_URL = os.environ.get('REQUIRE_DATABASE_URL', 'False').lower() in ('true', '1', 'yes')
+RUNNING_ON_RENDER = bool(os.environ.get('RENDER') or os.environ.get('RENDER_SERVICE_ID') or os.environ.get('RENDER_EXTERNAL_HOSTNAME'))
+
 if DATABASE_URL:
     DATABASES = {
-        'default': dj_database_url.parse(DATABASE_URL, conn_max_age=600, ssl_require=not DEBUG)
+        'default': dj_database_url.parse(
+            DATABASE_URL,
+            conn_max_age=600,
+            conn_health_checks=True,
+            ssl_require=not DEBUG,
+        )
     }
+elif REQUIRE_DATABASE_URL or (RUNNING_ON_RENDER and not DEBUG):
+    raise ImproperlyConfigured(
+        'DATABASE_URL مطلوب في بيئة الإنتاج/Render. '
+        'لا تستخدم SQLite على Render لأنها لا تحفظ البيانات بعد إعادة التشغيل أو إعادة النشر. '
+        'أنشئ PostgreSQL ثم أضف DATABASE_URL في Environment Variables.'
+    )
 else:
+    SQLITE_PATH = os.environ.get('SQLITE_PATH', str(BASE_DIR / 'db.sqlite3'))
     DATABASES = {
         'default': {
             'ENGINE': 'django.db.backends.sqlite3',
-            'NAME': BASE_DIR / 'db.sqlite3',
+            'NAME': SQLITE_PATH,
         }
     }
 

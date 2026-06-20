@@ -6,8 +6,16 @@ services:
     buildCommand: pip install --upgrade pip && pip install -r requirements.txt && python manage.py collectstatic --noinput
     startCommand: python manage.py migrate --noinput && python manage.py init_platform && gunicorn academy_platform.wsgi:application --bind 0.0.0.0:$PORT
     envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: academy-attendance-db
+          property: connectionString
+      - key: REQUIRE_DATABASE_URL
+        value: 'True'
+      - key: SECRET_KEY
+        generateValue: true
       - key: DEBUG
-        value: False
+        value: 'False'
       - key: ALLOWED_HOSTS
         value: .onrender.com,localhost,127.0.0.1
       - key: CSRF_TRUSTED_ORIGINS
@@ -16,3 +24,17 @@ services:
         value: https://i.top4top.io/p_3822gqcjp1.png
       - key: TELEGRAM_CHANNEL_URL
         value: ''
+      - key: ADMIN_USERNAME
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: ADMIN_EMAIL
+        sync: false
+      - key: ADMIN_FULL_NAME
+        value: مدير النظام
+
+databases:
+  - name: academy-attendance-db
+    plan: free
+    databaseName: academy_attendance
+    user: academy_user
