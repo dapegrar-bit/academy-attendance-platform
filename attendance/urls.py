@@ -19,6 +19,9 @@ urlpatterns = [
     path('panel/admin/reports/', views.admin_reports, name='admin_reports'),
     path('panel/admin/settings/', views.admin_settings, name='admin_settings'),
 
+    path('panel/notifications/poll/', views.poll_notifications, name='poll_notifications'),
+    path('panel/notifications/read/', views.mark_notifications_read, name='mark_notifications_read'),
+
     path('panel/trainee/', views.trainee_home, name='trainee_home'),
     path('panel/trainee/check-in/<int:session_id>/', views.check_in, name='check_in'),
     path('panel/trainee/calendar/', views.trainee_calendar, name='trainee_calendar'),

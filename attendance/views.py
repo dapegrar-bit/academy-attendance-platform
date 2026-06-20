@@ -15,7 +15,7 @@ from django.core.mail import send_mail
 from django.core.paginator import Paginator
 from django.db import transaction
 from django.db.models import Q
-from django.http import HttpResponse
+from django.http import HttpResponse, JsonResponse
 from django.shortcuts import render, redirect, get_object_or_404
 from django.utils import timezone
 
@@ -542,6 +542,52 @@ def admin_settings(request):
             messages.success(request, 'تم حفظ إعدادات النظام')
             return redirect('admin_settings')
     return render(request, 'attendance/admin_settings.html', {'form': form})
+
+
+@login_required
+def poll_notifications(request):
+    """واجهة خفيفة لتحديث تنبيهات المتدرب في الخلفية دون إعادة تحميل الصفحة."""
+    if request.user.is_staff:
+        return JsonResponse({'unread_count': 0, 'notifications': []})
+
+    last_id = request.GET.get('last_id')
+    qs = Notification.objects.filter(recipient=request.user).order_by('-created_at')
+    unread_count = qs.filter(is_read=False).count()
+
+    if last_id and str(last_id).isdigit():
+        qs = qs.filter(id__gt=int(last_id))
+    else:
+        qs = qs.filter(is_read=False)
+
+    items = []
+    for n in qs.order_by('created_at')[:10]:
+        items.append({
+            'id': n.id,
+            'title': n.title,
+            'body': n.body,
+            'created_at': timezone.localtime(n.created_at).strftime('%Y-%m-%d %H:%M'),
+            'session': n.session.title if n.session else '',
+        })
+
+    return JsonResponse({
+        'unread_count': unread_count,
+        'notifications': items,
+        'server_time': timezone.now().isoformat(),
+    })
+
+
+@login_required
+def mark_notifications_read(request):
+    if request.user.is_staff:
+        return JsonResponse({'ok': True, 'updated': 0})
+    if request.method != 'POST':
+        return JsonResponse({'ok': False, 'error': 'method_not_allowed'}, status=405)
+    ids = request.POST.getlist('ids[]') or request.POST.getlist('ids')
+    qs = Notification.objects.filter(recipient=request.user, is_read=False)
+    if ids:
+        qs = qs.filter(id__in=[i for i in ids if str(i).isdigit()])
+    updated = qs.update(is_read=True)
+    return JsonResponse({'ok': True, 'updated': updated})
 
 
 @login_required

@@ -86,3 +86,12 @@ EMAIL_HOST_PASSWORD=your-smtp-password
 EMAIL_USE_TLS=True
 DEFAULT_FROM_EMAIL=your-email@example.com
 ```
+
+## تحديث التنبيهات الفورية
+
+تمت إضافة تحديث خفي تلقائي للمتدربين عبر AJAX كل 5 ثوانٍ، حتى تظهر تنبيهات الإدارة للمتدرب مباشرة دون إعادة تحميل الصفحة. يعمل ذلك من خلال:
+
+- `panel/notifications/poll/` لجلب التنبيهات الجديدة.
+- `panel/notifications/read/` لتعليم التنبيه كمقروء بعد وصوله للمتدرب.
+- `static/js/app.js` للتحديث الخفي وعرض بطاقة تنبيه فورية.
+- `static/css/app.css` لتنسيق بطاقة التنبيه.

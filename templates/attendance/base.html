@@ -10,7 +10,7 @@
   <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
-<body>
+<body data-notification-poll-url="{% url 'poll_notifications' %}" data-notification-read-url="{% url 'mark_notifications_read' %}" data-user-role="{% if user.is_staff %}admin{% else %}trainee{% endif %}">
   <aside class="sidebar">
     <a class="brand" href="{% url 'home' %}">
       <img src="{% if brand.logo_url %}{{ brand.logo_url }}{% else %}{% static 'img/logo.svg' %}{% endif %}" alt="الشعار">
@@ -64,6 +64,7 @@
     <footer class="site-footer">جميع الحقوق محفوظة © 2026 أكاديميتي | تصميم وتطوير بأيدي سعودية - يحيى محمد</footer>
   </main>
   {% include 'attendance/messages.html' %}
+  <div id="live-notification-stack" class="live-notification-stack" aria-live="polite" aria-atomic="true"></div>
   <script src="{% static 'js/app.js' %}"></script>
 </body>
 </html>
