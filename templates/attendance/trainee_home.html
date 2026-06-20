@@ -35,13 +35,13 @@
             </div>
           {% else %}
             {% if row.checkin_open %}
-              <form method="post" action="{% url 'check_in' row.session.id %}" class="session-check-actions">{% csrf_token %}
-                <button class="btn btn-accent pulse-green" type="submit">تحضير هذه المحاضرة</button>
+              <form method="post" action="{% url 'check_in' row.session.id %}" class="session-check-actions attendance-circle-wrap">{% csrf_token %}
+                <button class="attendance-circle-btn attendance-open" type="submit">تحضير الآن</button>
                 <small class="muted">{{ row.checkin_message }} — بعد التحضير يظهر رابط الزووم الخاص بهذه المحاضرة فقط.</small>
               </form>
             {% else %}
-              <div class="session-check-actions">
-                <button class="btn btn-disabled" type="button" disabled>التحضير غير متاح الآن</button>
+              <div class="session-check-actions attendance-circle-wrap">
+                <button class="attendance-circle-btn attendance-closed" type="button" disabled>التحضير غير متاح</button>
                 <small class="muted">{{ row.checkin_message }}</small>
               </div>
             {% endif %}

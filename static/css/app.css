@@ -164,3 +164,56 @@ body, button, input, select, textarea{font-family:'Cairo','Segoe UI',Tahoma,Gene
   .telegram-card { flex-direction: column; align-items: stretch; }
   .telegram-card .btn { width: 100%; }
 }
+
+
+/* إعادة زر التحضير الدائري للمتدرب دون تغيير النظام */
+.attendance-circle-wrap{display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;min-width:170px}
+.attendance-circle-btn{
+  position:relative;
+  width:138px;
+  height:138px;
+  border-radius:50%;
+  border:1px solid rgba(128, 213, 180, .28);
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  text-align:center;
+  padding:0 18px;
+  line-height:1.65;
+  font-weight:900;
+  font-size:20px;
+  color:#f7fffb;
+  background:linear-gradient(135deg,#5aa08d,#4f9583 55%,#4a8d7c);
+  box-shadow:0 16px 38px rgba(0,0,0,.28), inset 0 1px 0 rgba(255,255,255,.12);
+  overflow:visible;
+}
+.attendance-circle-btn.attendance-open{cursor:pointer}
+.attendance-circle-btn.attendance-open::before,
+.attendance-circle-btn.attendance-open::after{
+  content:"";
+  position:absolute;
+  border-radius:50%;
+  border:2px solid rgba(111,197,165,.24);
+  inset:-12px;
+  animation:academyCirclePulse 2.2s infinite;
+}
+.attendance-circle-btn.attendance-open::after{inset:-26px;animation-delay:.6s}
+.attendance-circle-btn.attendance-closed{
+  background:linear-gradient(135deg,rgba(255,255,255,.08),rgba(255,255,255,.05));
+  color:rgba(236,255,248,.62);
+  border-color:rgba(255,255,255,.13);
+  cursor:not-allowed;
+  box-shadow:none;
+}
+.attendance-circle-btn.attendance-closed::before,
+.attendance-circle-btn.attendance-closed::after{display:none}
+@keyframes academyCirclePulse{
+  0%{transform:scale(.96);opacity:1}
+  100%{transform:scale(1.12);opacity:0}
+}
+@media(max-width:820px){
+  .attendance-circle-wrap{min-width:0;width:100%}
+}
+@media(max-width:560px){
+  .attendance-circle-btn{width:126px;height:126px;font-size:18px}
+}
