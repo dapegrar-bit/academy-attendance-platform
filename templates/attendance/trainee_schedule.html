@@ -1,8 +1,14 @@
 {% extends 'attendance/base.html' %}
 {% block title %}جدول المحاضرات{% endblock %}
 {% block content %}
-<div class="page-head"><div class="page-title"><h1>جدول المحاضرات</h1><p>كل محاضرات دفعتك التدريبية مرتبة زمنيًا، ويمكن تحضير محاضرات اليوم كل واحدة على حدة</p></div></div>
-<div class="table-wrap"><table class="data-table"><thead><tr><th>المحاضرة</th><th>التاريخ</th><th>الوقت</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>
+<div class="page-head"><div class="page-title"><h1>جدول المحاضرات</h1><p>كل محاضرات دفعتك التدريبية مرتبة زمنيًا، ويظهر زر التحضير فقط عند بداية وقت المحاضرة أو عند فتح حضور فجائي من الإدارة.</p></div></div>
+{% if brand.telegram_channel_url %}
+  <div class="telegram-card">
+    <div><strong>قناة التليجرام لتسجيلات المحاضرات</strong><p class="muted">يمكنك متابعة روابط تسجيل المحاضرات من القناة الرسمية.</p></div>
+    <a class="btn btn-accent" href="{{ brand.telegram_channel_url }}" target="_blank" rel="noopener">فتح قناة التليجرام ↗</a>
+  </div>
+{% endif %}
+<div class="table-wrap"><table class="data-table"><thead><tr><th>المحاضرة</th><th>التاريخ</th><th>الوقت</th><th>الحالة</th><th>التحضير</th><th>المحاضرة المسجلة</th></tr></thead><tbody>
 {% for s in sessions %}
 <tr>
   <td>{% if s.date == today %}<span class="badge today">اليوم</span>{% endif %} {{ s.title }}</td>
@@ -10,15 +16,16 @@
   <td>{% if s.start_time %}{{ s.start_time }}{% else %}—{% endif %}{% if s.end_time %} - {{ s.end_time }}{% endif %}</td>
   <td>{% if s.id in attended_ids %}<span class="badge">حاضر ✓</span>{% else %}<span class="badge absent">لم يحضر</span>{% endif %}</td>
   <td>
-    {% if s.date == today and s.id not in attended_ids %}
-      <form method="post" action="{% url 'check_in' s.id %}" class="inline-form">{% csrf_token %}<button class="btn btn-small btn-accent" type="submit">تحضير</button></form>
-    {% elif s.id in attended_ids %}
+    {% if s.id in attended_ids %}
       <span class="muted">تم التسجيل</span>
+    {% elif s.checkin_is_open %}
+      <form method="post" action="{% url 'check_in' s.id %}" class="inline-form">{% csrf_token %}<button class="btn btn-small btn-accent pulse-green" type="submit">تحضير الآن</button></form>
     {% else %}
-      <span class="muted">—</span>
+      <span class="badge disabled-badge">{{ s.checkin_message }}</span>
     {% endif %}
   </td>
+  <td>{% if s.recording_url %}<a class="btn btn-small btn-soft" href="{{ s.recording_url }}" target="_blank" rel="noopener">▣ التسجيل</a>{% else %}<span class="muted">لم يضف بعد</span>{% endif %}</td>
 </tr>
-{% empty %}<tr><td colspan="5" class="muted" style="text-align:center;padding:55px">لا توجد محاضرات بعد</td></tr>{% endfor %}
+{% empty %}<tr><td colspan="6" class="muted" style="text-align:center;padding:55px">لا توجد محاضرات بعد</td></tr>{% endfor %}
 </tbody></table></div>
 {% endblock %}

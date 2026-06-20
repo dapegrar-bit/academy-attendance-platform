@@ -115,3 +115,52 @@ body, button, input, select, textarea{font-family:'Cairo','Segoe UI',Tahoma,Gene
   .live-notification-stack{left:12px; right:12px; bottom:14px; width:auto}
   .live-notification-card{border-radius:16px; padding:14px}
 }
+
+/* تحديثات التحكم بوقت التحضير والتليجرام */
+.btn-disabled,
+.btn-disabled:hover {
+  background: rgba(255,255,255,.08) !important;
+  color: rgba(232,248,242,.55) !important;
+  border: 1px solid rgba(255,255,255,.12) !important;
+  cursor: not-allowed !important;
+  box-shadow: none !important;
+}
+.disabled-badge {
+  background: rgba(255,255,255,.07);
+  color: rgba(232,248,242,.68);
+  border: 1px solid rgba(255,255,255,.12);
+  max-width: 240px;
+  white-space: normal;
+  line-height: 1.7;
+}
+.pulse-green {
+  position: relative;
+  box-shadow: 0 0 0 0 rgba(111, 214, 169, .45);
+  animation: academyPulseGreen 1.7s infinite;
+}
+@keyframes academyPulseGreen {
+  0% { box-shadow: 0 0 0 0 rgba(111, 214, 169, .45); }
+  70% { box-shadow: 0 0 0 12px rgba(111, 214, 169, 0); }
+  100% { box-shadow: 0 0 0 0 rgba(111, 214, 169, 0); }
+}
+.telegram-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin: 0 0 18px;
+  padding: 18px 22px;
+  border-radius: 22px;
+  background: linear-gradient(135deg, rgba(47,125,111,.28), rgba(8,28,23,.92));
+  border: 1px solid rgba(111,214,169,.22);
+  box-shadow: var(--shadow);
+}
+.session-recording-link {
+  margin-top: 12px;
+  display: flex;
+  justify-content: flex-end;
+}
+@media (max-width: 760px){
+  .telegram-card { flex-direction: column; align-items: stretch; }
+  .telegram-card .btn { width: 100%; }
+}

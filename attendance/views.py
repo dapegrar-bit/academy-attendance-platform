@@ -167,6 +167,29 @@ def delete_batch(request, pk):
     return redirect('admin_batches')
 
 
+def send_instant_checkin_notice(session, sender_user=None):
+    """يفتح الحضور الفجائي ويرسل تنبيهًا داخليًا لكل متدربي الدفعة، مع بريد اختياري عند تفعيل SMTP."""
+    title = 'حضور فجائي متاح الآن'
+    body = f'تم فتح حضور فجائي لمحاضرة "{session.title}". يرجى الدخول إلى المنصة وتسجيل حضورك الآن.'
+    trainees = TraineeProfile.objects.filter(batch=session.batch).select_related('user')
+    sent = 0
+    for trainee in trainees:
+        Notification.objects.create(recipient=trainee.user, title=title, body=body, session=session)
+        sent += 1
+        if trainee.user.email:
+            try:
+                send_mail(
+                    subject=title,
+                    message=body,
+                    from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+                    recipient_list=[trainee.user.email],
+                    fail_silently=True,
+                )
+            except Exception:
+                pass
+    return sent
+
+
 @login_required
 @user_passes_test(is_admin)
 def admin_sessions(request):
@@ -174,11 +197,25 @@ def admin_sessions(request):
     instance = get_object_or_404(Session, pk=edit_id) if edit_id else None
     form = SessionForm(instance=instance)
     if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'toggle_instant_checkin':
+            session = get_object_or_404(Session, pk=request.POST.get('session_id'))
+            session.instant_checkin_enabled = not session.instant_checkin_enabled
+            if session.instant_checkin_enabled:
+                session.instant_checkin_sent_at = timezone.now()
+                session.save(update_fields=['instant_checkin_enabled', 'instant_checkin_sent_at'])
+                sent = send_instant_checkin_notice(session, request.user)
+                messages.success(request, f'تم فتح الحضور الفجائي وإرسال التنبيه إلى {sent} متدرب/ـة.')
+            else:
+                session.save(update_fields=['instant_checkin_enabled'])
+                messages.success(request, 'تم إيقاف الحضور الفجائي لهذه المحاضرة.')
+            return redirect('admin_sessions')
+
         instance = get_object_or_404(Session, pk=request.POST.get('session_id')) if request.POST.get('session_id') else None
         form = SessionForm(request.POST, instance=instance)
         if form.is_valid():
             form.save()
-            messages.success(request, 'تم حفظ المحاضرة ورابط الزووم')
+            messages.success(request, 'تم حفظ المحاضرة وروابطها')
             return redirect('admin_sessions')
         messages.error(request, 'لم يتم حفظ المحاضرة؛ تأكدي من الرابط والتاريخ.')
     batch_id = request.GET.get('batch')
@@ -620,6 +657,9 @@ def trainee_home(request):
                 'record': record,
                 'zoom_url': zoom_url if record else '',
                 'raw_zoom_url': zoom_url,
+                'checkin_open': session.checkin_is_open,
+                'checkin_message': session.checkin_message,
+                'recording_url': session.recording_url,
             })
 
     announcements = Announcement.objects.filter(is_active=True).filter(Q(audience='all') | Q(audience='trainee'))[:3]
@@ -645,17 +685,22 @@ def check_in(request, session_id):
         return redirect('admin_overview')
     profile = get_profile(request.user)
     session = get_object_or_404(Session, pk=session_id, batch=profile.batch, is_active=True)
+    existing = AttendanceRecord.objects.filter(trainee=profile, session=session).first()
+    if existing:
+        messages.info(request, 'حضورك لهذه المحاضرة مسجل مسبقًا.')
+        return redirect('trainee_home')
+    if not session.checkin_is_open:
+        messages.error(request, session.checkin_message)
+        return redirect('trainee_home')
     custom = TraineeZoomLink.objects.filter(session=session, trainee=profile).first()
     zoom_url = custom.zoom_url if custom else session.zoom_url
-    AttendanceRecord.objects.get_or_create(
+    AttendanceRecord.objects.create(
         trainee=profile,
         session=session,
-        defaults={
-            'status': 'present',
-            'zoom_url_snapshot': zoom_url,
-            'ip_address': get_client_ip(request),
-            'user_agent': request.META.get('HTTP_USER_AGENT', '')[:1000],
-        }
+        status='present',
+        zoom_url_snapshot=zoom_url,
+        ip_address=get_client_ip(request),
+        user_agent=request.META.get('HTTP_USER_AGENT', '')[:1000],
     )
     messages.success(request, 'تم تسجيل حضورك بنجاح')
     return redirect('trainee_home')

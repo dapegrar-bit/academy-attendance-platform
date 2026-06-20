@@ -12,6 +12,8 @@ class Command(BaseCommand):
         setting.academy_name = os.environ.get('ACADEMY_NAME', setting.academy_name or 'أكاديميتي')
         setting.system_name = os.environ.get('SYSTEM_NAME', setting.system_name or 'النظام الشامل للحضور والمحاضرات')
         setting.logo_url = os.environ.get('LOGO_URL', setting.logo_url or 'https://i.top4top.io/p_3822gqcjp1.png')
+        if os.environ.get('TELEGRAM_CHANNEL_URL'):
+            setting.telegram_channel_url = os.environ.get('TELEGRAM_CHANNEL_URL')
         setting.save()
 
         username = os.environ.get('ADMIN_USERNAME')

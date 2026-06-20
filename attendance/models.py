@@ -88,6 +88,9 @@ class Session(models.Model):
     start_time = models.TimeField('وقت البداية', null=True, blank=True)
     end_time = models.TimeField('وقت النهاية', null=True, blank=True)
     zoom_url = models.URLField('رابط زووم', max_length=500)
+    recording_url = models.URLField('رابط المحاضرة المسجلة من التليجرام', max_length=500, blank=True)
+    instant_checkin_enabled = models.BooleanField('حضور فجائي مفعّل', default=False)
+    instant_checkin_sent_at = models.DateTimeField('وقت إرسال الحضور الفجائي', null=True, blank=True)
     is_active = models.BooleanField('فعالة', default=True)
     created_at = models.DateTimeField('تاريخ الإضافة', auto_now_add=True)
 
@@ -115,6 +118,29 @@ class Session(models.Model):
     def attendance_ratio_text(self):
         total = self.batch.trainees.count()
         return f'{self.attendance_count}/{total}' if total else '0/0'
+
+    def checkin_state(self):
+        if self.instant_checkin_enabled:
+            return True, 'الحضور الفجائي متاح الآن من الإدارة'
+        today = timezone.localdate()
+        if self.date != today:
+            return False, 'التحضير يفتح في يوم المحاضرة فقط'
+        if not self.start_time:
+            return False, 'لم يتم تحديد وقت بداية المحاضرة'
+        current_time = timezone.localtime().time()
+        if current_time < self.start_time:
+            return False, f'يفتح التحضير عند بداية المحاضرة الساعة {self.start_time.strftime("%H:%M")}'
+        if self.end_time and current_time > self.end_time:
+            return False, 'انتهى وقت التحضير لهذه المحاضرة'
+        return True, 'التحضير متاح الآن'
+
+    @property
+    def checkin_is_open(self):
+        return self.checkin_state()[0]
+
+    @property
+    def checkin_message(self):
+        return self.checkin_state()[1]
 
 
 class TraineeZoomLink(models.Model):
@@ -204,6 +230,7 @@ class SiteSetting(models.Model):
     logo_url = models.URLField('رابط الشعار', max_length=500, default='https://i.top4top.io/p_3822gqcjp1.png')
     primary_color = models.CharField('اللون الأساسي', max_length=20, default='#2f7d6f')
     accent_color = models.CharField('لون التمييز', max_length=20, default='#f2bd3a')
+    telegram_channel_url = models.URLField('رابط قناة التليجرام لتسجيلات المحاضرات', max_length=500, blank=True)
 
     class Meta:
         verbose_name = 'إعدادات الموقع'

@@ -51,7 +51,7 @@ class BatchForm(forms.ModelForm):
 class SessionForm(forms.ModelForm):
     class Meta:
         model = Session
-        fields = ['batch', 'title', 'description', 'date', 'start_time', 'end_time', 'zoom_url', 'is_active']
+        fields = ['batch', 'title', 'description', 'date', 'start_time', 'end_time', 'zoom_url', 'recording_url', 'is_active']
         widgets = {
             'date': forms.DateInput(attrs={'type': 'date'}),
             'start_time': forms.TimeInput(attrs={'type': 'time'}),
@@ -152,4 +152,4 @@ class ProfileForm(forms.ModelForm):
 class SiteSettingForm(forms.ModelForm):
     class Meta:
         model = SiteSetting
-        fields = ['academy_name', 'system_name', 'logo_url', 'primary_color', 'accent_color']
+        fields = ['academy_name', 'system_name', 'logo_url', 'primary_color', 'accent_color', 'telegram_channel_url']

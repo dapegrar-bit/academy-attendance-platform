@@ -34,10 +34,20 @@
               <div class="zoom-box compact"><span class="muted">رابط المحاضرة</span><a class="btn" href="{{ row.zoom_url }}" target="_blank" rel="noopener">فتح الزووم ▣</a><span>{{ row.zoom_url|truncatechars:42 }}</span></div>
             </div>
           {% else %}
-            <form method="post" action="{% url 'check_in' row.session.id %}" class="session-check-actions">{% csrf_token %}
-              <button class="btn btn-accent" type="submit">تحضير هذه المحاضرة</button>
-              <small class="muted">بعد التحضير يظهر رابط الزووم الخاص بهذه المحاضرة فقط.</small>
-            </form>
+            {% if row.checkin_open %}
+              <form method="post" action="{% url 'check_in' row.session.id %}" class="session-check-actions">{% csrf_token %}
+                <button class="btn btn-accent pulse-green" type="submit">تحضير هذه المحاضرة</button>
+                <small class="muted">{{ row.checkin_message }} — بعد التحضير يظهر رابط الزووم الخاص بهذه المحاضرة فقط.</small>
+              </form>
+            {% else %}
+              <div class="session-check-actions">
+                <button class="btn btn-disabled" type="button" disabled>التحضير غير متاح الآن</button>
+                <small class="muted">{{ row.checkin_message }}</small>
+              </div>
+            {% endif %}
+          {% endif %}
+          {% if row.recording_url %}
+            <div class="session-recording-link"><a class="btn btn-small btn-soft" href="{{ row.recording_url }}" target="_blank" rel="noopener">▣ المحاضرة المسجلة</a></div>
           {% endif %}
         </div>
       {% endfor %}

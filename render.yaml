@@ -14,3 +14,5 @@ services:
         value: https://*.onrender.com
       - key: LOGO_URL
         value: https://i.top4top.io/p_3822gqcjp1.png
+      - key: TELEGRAM_CHANNEL_URL
+        value: ''

@@ -18,9 +18,9 @@ class TraineeProfileAdmin(admin.ModelAdmin):
 
 @admin.register(Session)
 class SessionAdmin(admin.ModelAdmin):
-    list_display = ('title', 'batch', 'date', 'start_time', 'is_active', 'attendance_ratio_text')
-    search_fields = ('title', 'description', 'zoom_url')
-    list_filter = ('batch', 'date', 'is_active')
+    list_display = ('title', 'batch', 'date', 'start_time', 'instant_checkin_enabled', 'is_active', 'attendance_ratio_text')
+    search_fields = ('title', 'description', 'zoom_url', 'recording_url')
+    list_filter = ('batch', 'date', 'is_active', 'instant_checkin_enabled')
 
 
 @admin.register(TraineeZoomLink)
@@ -44,7 +44,7 @@ class AnnouncementAdmin(admin.ModelAdmin):
 
 @admin.register(SiteSetting)
 class SiteSettingAdmin(admin.ModelAdmin):
-    list_display = ('academy_name', 'system_name', 'primary_color', 'accent_color')
+    list_display = ('academy_name', 'system_name', 'primary_color', 'accent_color', 'telegram_channel_url')
 
 
 @admin.register(Notification)
