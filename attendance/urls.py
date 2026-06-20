@@ -12,6 +12,7 @@ urlpatterns = [
     path('panel/admin/sessions/', views.admin_sessions, name='admin_sessions'),
     path('panel/admin/sessions/<int:pk>/delete/', views.delete_session, name='delete_session'),
     path('panel/admin/trainees/', views.admin_trainees, name='admin_trainees'),
+    path('panel/admin/trainees/export/', views.export_trainees_csv, name='export_trainees_csv'),
     path('panel/admin/trainees/<int:pk>/delete/', views.delete_trainee, name='delete_trainee'),
     path('panel/admin/attendance/', views.admin_attendance, name='admin_attendance'),
     path('panel/admin/attendance/export/', views.export_attendance_csv, name='export_attendance_csv'),

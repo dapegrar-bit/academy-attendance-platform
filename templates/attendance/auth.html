@@ -5,6 +5,9 @@
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
   <title>تسجيل الدخول | أكاديميتي</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700;800;900&display=swap" rel="stylesheet">
   <link rel="stylesheet" href="{% static 'css/app.css' %}">
 </head>
 <body class="auth-body">
@@ -51,13 +54,8 @@
         <button class="btn btn-block" type="submit">إنشاء الحساب والدخول</button>
       </form>
     </div>
-
-    <div class="help-box" style="margin-top:18px">
-      <strong>للتجربة السريعة:</strong><br>
-      إدارة <code>admin / admin123</code><br>
-      متدرب <code>sara / 1234</code>
-    </div>
   </div>
+  <footer class="auth-footer">جميع الحقوق محفوظة لمبرمج ومصمم الموقع يحيى محمد 2026-0532061809</footer>
   {% include 'attendance/messages.html' %}
   <script src="{% static 'js/app.js' %}"></script>
 </body>

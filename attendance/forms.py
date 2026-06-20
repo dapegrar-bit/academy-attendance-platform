@@ -1,12 +1,23 @@
 from django import forms
+import secrets
+import string
 from django.contrib.auth.models import User
 from django.contrib.auth.forms import AuthenticationForm
 from .models import Batch, Session, TraineeProfile, SiteSetting
 
 
 class ArabicAuthenticationForm(AuthenticationForm):
-    username = forms.CharField(label='اسم المستخدم', widget=forms.TextInput(attrs={'placeholder': 'أدخل اسم المستخدم'}))
-    password = forms.CharField(label='كلمة المرور', widget=forms.PasswordInput(attrs={'placeholder': '••••••••'}))
+    username = forms.CharField(
+        label='اسم المستخدم',
+        widget=forms.TextInput(attrs={'placeholder': 'أدخل اسم المستخدم', 'autocomplete': 'username'})
+    )
+    password = forms.CharField(
+        label='كلمة المرور',
+        widget=forms.PasswordInput(attrs={'placeholder': '••••••••', 'autocomplete': 'current-password'})
+    )
+
+    def clean_username(self):
+        return self.cleaned_data['username'].strip()
 
 
 class RegisterForm(forms.Form):
@@ -14,7 +25,8 @@ class RegisterForm(forms.Form):
     batch = forms.ModelChoiceField(label='الدفعة / المجموعة التدريبية', queryset=Batch.objects.filter(is_active=True), required=False, empty_label='اختر الدفعة...')
     username = forms.CharField(label='اسم المستخدم', max_length=150, widget=forms.TextInput(attrs={'placeholder': 'بدون فراغات، حروف إنجليزية'}))
     phone = forms.CharField(label='رقم الجوال', max_length=30, required=False, widget=forms.TextInput(attrs={'placeholder': '05XXXXXXXX'}))
-    password = forms.CharField(label='كلمة المرور', min_length=4, widget=forms.PasswordInput(attrs={'placeholder': '4 أحرف على الأقل'}))
+    email = forms.EmailField(label='البريد الإلكتروني', required=False, widget=forms.EmailInput(attrs={'placeholder': 'name@example.com'}))
+    password = forms.CharField(label='كلمة المرور', min_length=6, widget=forms.PasswordInput(attrs={'placeholder': '6 أحرف على الأقل'}))
 
     def clean_username(self):
         username = self.cleaned_data['username'].strip()
@@ -26,12 +38,13 @@ class RegisterForm(forms.Form):
 
 
 class BatchForm(forms.ModelForm):
+    color = forms.ChoiceField(label='لون الدفعة', choices=Batch.COLORS, widget=forms.RadioSelect)
+
     class Meta:
         model = Batch
         fields = ['name', 'description', 'color', 'is_active']
         widgets = {
             'description': forms.Textarea(attrs={'rows': 3}),
-            'color': forms.RadioSelect,
         }
 
 
@@ -58,6 +71,7 @@ class TraineeAdminForm(forms.Form):
     def __init__(self, *args, instance=None, **kwargs):
         self.instance = instance
         super().__init__(*args, **kwargs)
+        self.fields['batch'].queryset = Batch.objects.filter(is_active=True)
         if instance:
             self.fields['username'].initial = instance.user.username
             self.fields['email'].initial = instance.user.email
@@ -78,14 +92,14 @@ class TraineeAdminForm(forms.Form):
         if self.instance:
             user = self.instance.user
         else:
-            user = User()
+            user = User(is_staff=False, is_superuser=False)
         user.username = self.cleaned_data['username']
         user.email = self.cleaned_data.get('email') or ''
         user.first_name = self.cleaned_data['full_name']
         if self.cleaned_data.get('password'):
             user.set_password(self.cleaned_data['password'])
         elif not user.pk:
-            user.set_password('1234')
+            user.set_password(''.join(secrets.choice(string.ascii_letters + string.digits) for _ in range(12)))
         user.save()
         profile, _ = TraineeProfile.objects.get_or_create(user=user)
         profile.full_name = self.cleaned_data['full_name']
@@ -93,6 +107,23 @@ class TraineeAdminForm(forms.Form):
         profile.batch = self.cleaned_data.get('batch')
         profile.save()
         return profile
+
+
+class TraineeImportForm(forms.Form):
+    excel_file = forms.FileField(label='ملف Excel', help_text='يدعم .xlsx فقط')
+    default_batch = forms.ModelChoiceField(label='دفعة افتراضية عند ترك خانة الدفعة فارغة', queryset=Batch.objects.filter(is_active=True), required=False, empty_label='بدون دفعة افتراضية')
+    update_existing = forms.BooleanField(label='تحديث بيانات المتدربين الموجودين مسبقًا', required=False, initial=True)
+    default_password = forms.CharField(label='كلمة مرور موحدة للصفوف التي لا تحتوي كلمة مرور', required=False, widget=forms.TextInput(attrs={'placeholder': 'اختياري، الأفضل وضع كلمة مرور في ملف Excel'}))
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.fields['default_batch'].queryset = Batch.objects.filter(is_active=True)
+
+    def clean_excel_file(self):
+        f = self.cleaned_data['excel_file']
+        if not f.name.lower().endswith('.xlsx'):
+            raise forms.ValidationError('يرجى رفع ملف Excel بصيغة xlsx فقط.')
+        return f
 
 
 class ProfileForm(forms.ModelForm):

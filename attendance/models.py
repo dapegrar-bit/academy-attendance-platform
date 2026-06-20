@@ -1,7 +1,6 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.urls import reverse
 
 
 class Batch(models.Model):
@@ -11,10 +10,11 @@ class Batch(models.Model):
         ('#2d5d54', 'أخضر داكن'),
         ('#9cc9ba', 'نعناعي'),
         ('#3f8f80', 'فيروزي'),
+        ('#6dbb8e', 'أخضر فاتح'),
     ]
     name = models.CharField('اسم الدفعة', max_length=180)
     description = models.TextField('وصف مختصر', blank=True)
-    color = models.CharField('لون الدفعة', max_length=20, default='#2f7d6f')
+    color = models.CharField('لون الدفعة', max_length=20, choices=COLORS, default='#2f7d6f')
     is_active = models.BooleanField('نشطة', default=True)
     created_at = models.DateTimeField('تاريخ الإنشاء', auto_now_add=True)
 
@@ -37,7 +37,7 @@ class Batch(models.Model):
     @property
     def attendance_rate(self):
         profiles = self.trainees.all()
-        sessions = self.sessions.all()
+        sessions = self.sessions.filter(is_active=True)
         total = profiles.count() * sessions.count()
         if total == 0:
             return 0
@@ -69,10 +69,10 @@ class TraineeProfile(models.Model):
     def attendance_rate(self):
         if not self.batch:
             return 0
-        sessions_count = self.batch.sessions.count()
+        sessions_count = self.batch.sessions.filter(is_active=True).count()
         if sessions_count == 0:
             return 0
-        present = self.attendance_records.filter(session__batch=self.batch, status='present').count()
+        present = self.attendance_records.filter(session__batch=self.batch, session__is_active=True, status='present').count()
         return round((present / sessions_count) * 100)
 
     @property
@@ -95,6 +95,10 @@ class Session(models.Model):
         verbose_name = 'محاضرة ورابط زووم'
         verbose_name_plural = 'المحاضرات وروابط الزووم'
         ordering = ['-date', '-start_time']
+        indexes = [
+            models.Index(fields=['date', 'is_active']),
+            models.Index(fields=['batch', 'date']),
+        ]
 
     def __str__(self):
         return f'{self.title} - {self.batch.name}'
@@ -146,9 +150,31 @@ class AttendanceRecord(models.Model):
         verbose_name_plural = 'سجلات الحضور'
         unique_together = ('trainee', 'session')
         ordering = ['-checked_at']
+        indexes = [
+            models.Index(fields=['trainee', 'session']),
+            models.Index(fields=['status', 'checked_at']),
+        ]
 
     def __str__(self):
         return f'{self.trainee} - {self.session} - {self.get_status_display()}'
+
+
+class Notification(models.Model):
+    recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='platform_notifications', verbose_name='المستلم')
+    title = models.CharField('العنوان', max_length=180)
+    body = models.TextField('الرسالة')
+    session = models.ForeignKey(Session, on_delete=models.SET_NULL, null=True, blank=True, related_name='notifications', verbose_name='المحاضرة')
+    created_at = models.DateTimeField('تاريخ الإرسال', auto_now_add=True)
+    is_read = models.BooleanField('مقروءة', default=False)
+
+    class Meta:
+        verbose_name = 'تنبيه متدرب'
+        verbose_name_plural = 'تنبيهات المتدربين'
+        ordering = ['-created_at']
+        indexes = [models.Index(fields=['recipient', 'is_read', '-created_at'])]
+
+    def __str__(self):
+        return f'{self.title} - {self.recipient.username}'
 
 
 class Announcement(models.Model):

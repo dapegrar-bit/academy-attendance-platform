@@ -1,38 +1,34 @@
 # منصة أكاديميتي لإدارة الحضور والغياب والمحاضرات
 
-نظام عربي RTL مبني بـ Django لإدارة تحضير المتدربين في الأكاديمية. لا يظهر رابط Zoom للمتدرب إلا بعد الضغط على زر التحضير، ويتم تسجيل وقت الحضور وبيانات المتدرب والدفعة والمحاضرة والرابط المستخدم.
+نظام عربي مبني بـ Django لإدارة حضور المتدربين، روابط Zoom، الدفعات، المتدربين، الاستيراد من Excel، سجلات الحضور، تنبيهات الغياب، والتقارير.
 
-## المميزات
+## أهم التحديثات في هذه النسخة
 
-- تسجيل دخول للإدارة والمتدربين.
-- إنشاء حساب متدرب ذاتيًا أو إضافة متدرب من الإدارة.
-- إدارة الدفعات التدريبية.
-- إدارة المحاضرات وروابط Zoom حسب الدفعة.
-- تحضير يومي قبل ظهور رابط Zoom.
-- حفظ وقت التحضير وIP والمتصفح والرابط المستخدم.
-- لوحة متدرب: نسبة الحضور، زر التحضير، جدول المحاضرات، سجل شهري، تحديث الحساب.
-- لوحة إدارة: نظرة عامة، الدفعات، المتدربون، المحاضرات، سجلات الحضور، التقارير، الإعدادات.
-- فلترة حسب الدفعة والتاريخ والحالة والاسم.
-- تصدير CSV.
-- تصميم داكن مطابق للصور المرفقة بدرجة كبيرة.
-- شعار أكاديميتي مضاف من الرابط: https://i.top4top.io/p_3822gqcjp1.png
-- جاهز للرفع على GitHub والتشغيل على Render.
+- إزالة بيانات الدخول التجريبية من واجهة تسجيل الدخول.
+- إنشاء حساب المدير من متغيرات Render بدل عرض بيانات عامة في الصفحة.
+- تحسين سرعة سجلات الحضور: العرض الافتراضي لليوم فقط مع ترقيم الصفحات.
+- إصلاح دخول المتدربين ولوحة المتدرب.
+- نقل عنوان النظام إلى أعلى الصفحة في المنتصف.
+- إصلاح إنشاء وتعديل الدفعات واختيار لون الدفعة.
+- استيراد المتدربين من Excel بصيغة xlsx.
+- تصدير المتدربين CSV.
+- إرسال تنبيه للغائبين داخل حساب المتدرب وعبر البريد عند ضبط SMTP.
+- إضافة تذييل الحقوق في جميع الصفحات.
+- استخدام خط Cairo في كل الموقع.
 
-## بيانات تجربة
+## صيغة ملف Excel للاستيراد
 
-بعد تشغيل أمر البيانات التجريبية:
+الصف الأول يحتوي العناوين التالية:
 
-```text
-الإدارة:
-admin
-admin123
+| الاسم الكامل | اسم المستخدم | رقم الجوال | البريد الإلكتروني | الدفعة | كلمة المرور |
+|---|---|---|---|---|---|
+| سارة العتيبي | sara01 | 0500000000 | sara@example.com | دفعة تطوير الويب | S@ra2026 |
 
-المتدرب:
-sara
-1234
-```
+يمكن أيضًا استخدام عناوين إنجليزية:
 
-## التشغيل المحلي
+`full_name, username, phone, email, batch, password`
+
+## تشغيل محلي
 
 ```bash
 python -m venv .venv
@@ -40,77 +36,53 @@ python -m venv .venv
 pip install -r requirements.txt
 copy .env.example .env
 python manage.py migrate
-python manage.py seed_demo
+python manage.py init_platform
 python manage.py runserver
 ```
 
-افتحي:
+قبل تشغيل `init_platform` محليًا ضعي داخل `.env`:
 
-```text
-http://127.0.0.1:8000/
+```env
+ADMIN_USERNAME=admin
+ADMIN_PASSWORD=كلمة_مرور_قوية
 ```
-
-## رفع المشروع على GitHub من المتصفح
-
-1. افتحي مستودع GitHub.
-2. احذفي الملفات القديمة إن كانت ناقصة أو ارفعي هذا المشروع كاملًا.
-3. اضغطي `Add file` ثم `Upload files`.
-4. اسحبي كل ملفات ومجلدات المشروع، خصوصًا:
-
-```text
-academy_platform
-attendance
-templates
-static
-docs
-manage.py
-requirements.txt
-runtime.txt
-Procfile
-render.yaml
-.env.example
-README.md
-```
-
-5. اضغطي `Commit changes`.
 
 ## إعداد Render
-
-في صفحة New Web Service:
-
-```text
-Language: Python 3
-Branch: main
-Root Directory: فارغ
-```
 
 Build Command:
 
 ```bash
-pip install -r requirements.txt && python manage.py collectstatic --noinput
+pip install --upgrade pip && pip install -r requirements.txt && python manage.py collectstatic --noinput
 ```
 
 Start Command:
 
 ```bash
-python manage.py migrate && python manage.py seed_demo && gunicorn academy_platform.wsgi:application --bind 0.0.0.0:$PORT
+python manage.py migrate --noinput && python manage.py init_platform && gunicorn academy_platform.wsgi:application --bind 0.0.0.0:$PORT
 ```
 
-Environment Variables:
+Environment Variables الأساسية:
 
-```text
-SECRET_KEY = Generate
-DEBUG = False
-ALLOWED_HOSTS = .onrender.com,localhost,127.0.0.1
-CSRF_TRUSTED_ORIGINS = https://*.onrender.com
+```env
+SECRET_KEY=Generate
+DEBUG=False
+ALLOWED_HOSTS=.onrender.com,localhost,127.0.0.1
+CSRF_TRUSTED_ORIGINS=https://*.onrender.com
+LOGO_URL=https://i.top4top.io/p_3822gqcjp1.png
+ADMIN_USERNAME=اسم_مدير_خاص
+ADMIN_PASSWORD=كلمة_مرور_قوية_خاصة
+ADMIN_EMAIL=your-email@example.com
+ADMIN_FULL_NAME=مدير النظام
 ```
 
-## ملاحظة مهمة للبيانات الدائمة
+لتفعيل البريد الحقيقي، أضيفي إعدادات SMTP:
 
-للتجربة يعمل النظام بدون PostgreSQL باستخدام SQLite. للتشغيل الحقيقي وحفظ بيانات الحضور بشكل دائم، أنشئي قاعدة PostgreSQL في Render ثم أضيفي متغير:
-
-```text
-DATABASE_URL = رابط قاعدة البيانات من Render
+```env
+EMAIL_BACKEND=django.core.mail.backends.smtp.EmailBackend
+EMAIL_HOST=smtp.example.com
+EMAIL_PORT=587
+EMAIL_HOST_USER=your-smtp-user
+EMAIL_HOST_PASSWORD=your-smtp-password
+EMAIL_USE_TLS=True
+DEFAULT_FROM_EMAIL=your-email@example.com
 ```
-
-الكود يدعم PostgreSQL تلقائيًا عند وجود DATABASE_URL.

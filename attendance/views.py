@@ -1,22 +1,31 @@
 import csv
 import calendar
+from collections import defaultdict
 from datetime import date
+from io import BytesIO
+
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth import authenticate, login, update_session_auth_hash
 from django.contrib.auth.decorators import login_required, user_passes_test
-from django.contrib.auth.models import User
 from django.contrib.auth.forms import PasswordChangeForm
-from django.db.models import Count, Q
+from django.contrib.auth.hashers import make_password
+from django.contrib.auth.models import User
+from django.core.mail import send_mail
+from django.core.paginator import Paginator
+from django.db import transaction
+from django.db.models import Q
 from django.http import HttpResponse
 from django.shortcuts import render, redirect, get_object_or_404
-from django.urls import reverse
 from django.utils import timezone
+
 from .forms import (
     ArabicAuthenticationForm,
     RegisterForm,
     BatchForm,
     SessionForm,
     TraineeAdminForm,
+    TraineeImportForm,
     ProfileForm,
     SiteSettingForm,
 )
@@ -28,6 +37,7 @@ from .models import (
     Announcement,
     TraineeZoomLink,
     SiteSetting,
+    Notification,
 )
 
 
@@ -62,19 +72,19 @@ def auth_view(request):
     if request.user.is_authenticated:
         return redirect('home')
 
-    login_form = ArabicAuthenticationForm(request, data=request.POST or None if request.POST.get('action') == 'login' else None)
-    register_form = RegisterForm(request.POST or None if request.POST.get('action') == 'register' else None)
     active_tab = request.POST.get('action', 'login')
+    login_form = ArabicAuthenticationForm(request, data=request.POST if request.POST.get('action') == 'login' else None)
+    register_form = RegisterForm(request.POST if request.POST.get('action') == 'register' else None)
 
     if request.method == 'POST' and request.POST.get('action') == 'login':
-        username = request.POST.get('username')
-        password = request.POST.get('password')
+        username = (request.POST.get('username') or '').strip()
+        password = request.POST.get('password') or ''
         user = authenticate(request, username=username, password=password)
-        if user is not None:
+        if user is not None and user.is_active:
             login(request, user)
             messages.success(request, f'أهلًا بك، {user.first_name or user.username}')
             return redirect('home')
-        messages.error(request, 'بيانات الدخول غير صحيحة.')
+        messages.error(request, 'بيانات الدخول غير صحيحة أو الحساب غير مفعّل.')
 
     if request.method == 'POST' and request.POST.get('action') == 'register':
         if register_form.is_valid():
@@ -82,6 +92,7 @@ def auth_view(request):
                 username=register_form.cleaned_data['username'],
                 password=register_form.cleaned_data['password'],
                 first_name=register_form.cleaned_data['full_name'],
+                email=register_form.cleaned_data.get('email') or '',
             )
             TraineeProfile.objects.create(
                 user=user,
@@ -107,7 +118,7 @@ def admin_overview(request):
     today = timezone.localdate()
     trainees_count = TraineeProfile.objects.count()
     batches_count = Batch.objects.filter(is_active=True).count()
-    sessions_today = Session.objects.filter(date=today, is_active=True)
+    sessions_today = Session.objects.filter(date=today, is_active=True).select_related('batch')
     today_records = AttendanceRecord.objects.filter(session__date=today, status='present')
     sessions_total = Session.objects.count()
     possible_today = sum(s.batch.trainees.count() for s in sessions_today)
@@ -135,15 +146,14 @@ def admin_batches(request):
     instance = get_object_or_404(Batch, pk=edit_id) if edit_id else None
     form = BatchForm(instance=instance)
     if request.method == 'POST':
-        instance = None
-        if request.POST.get('batch_id'):
-            instance = get_object_or_404(Batch, pk=request.POST.get('batch_id'))
+        instance = get_object_or_404(Batch, pk=request.POST.get('batch_id')) if request.POST.get('batch_id') else None
         form = BatchForm(request.POST, instance=instance)
         if form.is_valid():
             form.save()
             messages.success(request, 'تم حفظ الدفعة بنجاح')
             return redirect('admin_batches')
-    batches = Batch.objects.all()
+        messages.error(request, 'لم يتم حفظ الدفعة؛ راجعي الحقول المطلوبة.')
+    batches = Batch.objects.all().prefetch_related('trainees', 'sessions')
     return render(request, 'attendance/admin_batches.html', {'batches': batches, 'form': form, 'edit_instance': instance})
 
 
@@ -164,18 +174,18 @@ def admin_sessions(request):
     instance = get_object_or_404(Session, pk=edit_id) if edit_id else None
     form = SessionForm(instance=instance)
     if request.method == 'POST':
-        instance = None
-        if request.POST.get('session_id'):
-            instance = get_object_or_404(Session, pk=request.POST.get('session_id'))
+        instance = get_object_or_404(Session, pk=request.POST.get('session_id')) if request.POST.get('session_id') else None
         form = SessionForm(request.POST, instance=instance)
         if form.is_valid():
             form.save()
             messages.success(request, 'تم حفظ المحاضرة ورابط الزووم')
             return redirect('admin_sessions')
+        messages.error(request, 'لم يتم حفظ المحاضرة؛ تأكدي من الرابط والتاريخ.')
     batch_id = request.GET.get('batch')
     sessions = Session.objects.select_related('batch')
     if batch_id:
         sessions = sessions.filter(batch_id=batch_id)
+    sessions = sessions[:250]
     return render(request, 'attendance/admin_sessions.html', {
         'sessions': sessions,
         'form': form,
@@ -196,36 +206,173 @@ def delete_session(request, pk):
     return redirect('admin_sessions')
 
 
+def normalize_header(value):
+    return str(value or '').strip().lower().replace(' ', '_').replace('-', '_')
+
+
+def get_cell(row_map, *names):
+    for name in names:
+        key = normalize_header(name)
+        value = row_map.get(key)
+        if value not in (None, ''):
+            return str(value).strip()
+    return ''
+
+
+def import_trainees_from_excel(file_obj, default_batch=None, update_existing=True, default_password=''):
+    from openpyxl import load_workbook
+
+    wb = load_workbook(file_obj, read_only=True, data_only=True)
+    ws = wb.active
+    rows = list(ws.iter_rows(values_only=True))
+    if not rows:
+        return {'created': 0, 'updated': 0, 'skipped': 0, 'errors': ['الملف فارغ.']}
+
+    headers = [normalize_header(h) for h in rows[0]]
+    header_has_names = any(h in headers for h in ['username', 'اسم_المستخدم', 'full_name', 'الاسم', 'الاسم_الكامل'])
+    data_rows = rows[1:] if header_has_names else rows
+    if not header_has_names:
+        headers = ['full_name', 'username', 'phone', 'email', 'batch', 'password']
+
+    created = updated = skipped = 0
+    errors = []
+    batch_cache = {b.name.strip(): b for b in Batch.objects.all()}
+
+    with transaction.atomic():
+        for idx, row in enumerate(data_rows, start=2 if header_has_names else 1):
+            row_map = {headers[i]: row[i] if i < len(row) else '' for i in range(len(headers))}
+            full_name = get_cell(row_map, 'full_name', 'name', 'الاسم', 'الاسم الكامل', 'اسم المتدرب')
+            username = get_cell(row_map, 'username', 'user', 'اسم المستخدم')
+            phone = get_cell(row_map, 'phone', 'mobile', 'رقم الجوال', 'الجوال')
+            email = get_cell(row_map, 'email', 'البريد الإلكتروني', 'البريد')
+            batch_name = get_cell(row_map, 'batch', 'group', 'دفعة', 'الدفعة')
+            password = get_cell(row_map, 'password', 'كلمة المرور', 'كلمة_المرور') or default_password
+
+            if not full_name and not username:
+                continue
+            if not username:
+                skipped += 1
+                errors.append(f'الصف {idx}: اسم المستخدم مطلوب.')
+                continue
+            if not full_name:
+                full_name = username
+            if not password:
+                skipped += 1
+                errors.append(f'الصف {idx}: كلمة المرور مطلوبة أو ضعي كلمة مرور موحدة في نموذج الاستيراد.')
+                continue
+
+            selected_batch = default_batch
+            if batch_name:
+                selected_batch = batch_cache.get(batch_name)
+                if selected_batch is None:
+                    selected_batch = Batch.objects.create(name=batch_name, description='أُنشئت تلقائيًا من ملف Excel')
+                    batch_cache[batch_name] = selected_batch
+
+            user = User.objects.filter(username=username).first()
+            if user and not update_existing:
+                skipped += 1
+                continue
+            if user:
+                user.first_name = full_name
+                user.email = email
+                user.is_staff = False
+                user.is_superuser = False
+                user.set_password(password)
+                user.save(update_fields=['first_name', 'email', 'is_staff', 'is_superuser', 'password'])
+                profile, _ = TraineeProfile.objects.get_or_create(user=user)
+                updated += 1
+            else:
+                user = User.objects.create(
+                    username=username,
+                    first_name=full_name,
+                    email=email,
+                    password=make_password(password),
+                    is_staff=False,
+                    is_superuser=False,
+                )
+                profile = TraineeProfile(user=user)
+                created += 1
+
+            profile.full_name = full_name
+            profile.phone = phone
+            profile.batch = selected_batch
+            profile.save()
+
+    return {'created': created, 'updated': updated, 'skipped': skipped, 'errors': errors[:20]}
+
+
 @login_required
 @user_passes_test(is_admin)
 def admin_trainees(request):
     edit_id = request.GET.get('edit')
     instance = get_object_or_404(TraineeProfile, pk=edit_id) if edit_id else None
     form = TraineeAdminForm(instance=instance)
-    if request.method == 'POST':
-        instance = None
-        if request.POST.get('trainee_id'):
-            instance = get_object_or_404(TraineeProfile, pk=request.POST.get('trainee_id'))
+    import_form = TraineeImportForm()
+
+    if request.method == 'POST' and request.POST.get('action') == 'manual':
+        instance = get_object_or_404(TraineeProfile, pk=request.POST.get('trainee_id')) if request.POST.get('trainee_id') else None
         form = TraineeAdminForm(request.POST, instance=instance)
         if form.is_valid():
             form.save()
             messages.success(request, 'تم حفظ بيانات المتدرب')
             return redirect('admin_trainees')
+        messages.error(request, 'لم يتم حفظ بيانات المتدرب؛ راجعي الحقول المطلوبة.')
+
+    if request.method == 'POST' and request.POST.get('action') == 'import':
+        import_form = TraineeImportForm(request.POST, request.FILES)
+        if import_form.is_valid():
+            result = import_trainees_from_excel(
+                request.FILES['excel_file'],
+                default_batch=import_form.cleaned_data.get('default_batch'),
+                update_existing=import_form.cleaned_data.get('update_existing'),
+                default_password=import_form.cleaned_data.get('default_password') or '',
+            )
+            msg = f"تم الاستيراد: {result['created']} جديد، {result['updated']} تحديث، {result['skipped']} متجاوز."
+            messages.success(request, msg)
+            for err in result['errors']:
+                messages.error(request, err)
+            return redirect('admin_trainees')
+        messages.error(request, 'لم يتم استيراد الملف؛ تأكدي من صيغة Excel والحقول.')
+
     q = request.GET.get('q', '')
     batch_id = request.GET.get('batch', '')
     trainees = TraineeProfile.objects.select_related('user', 'batch')
     if q:
-        trainees = trainees.filter(Q(full_name__icontains=q) | Q(phone__icontains=q) | Q(user__username__icontains=q))
+        trainees = trainees.filter(Q(full_name__icontains=q) | Q(phone__icontains=q) | Q(user__username__icontains=q) | Q(user__email__icontains=q))
     if batch_id:
         trainees = trainees.filter(batch_id=batch_id)
+    paginator = Paginator(trainees, 100)
+    page_obj = paginator.get_page(request.GET.get('page'))
     return render(request, 'attendance/admin_trainees.html', {
-        'trainees': trainees,
+        'trainees': page_obj.object_list,
+        'page_obj': page_obj,
         'batches': Batch.objects.filter(is_active=True),
         'form': form,
+        'import_form': import_form,
         'q': q,
         'selected_batch': batch_id,
         'edit_instance': instance,
     })
+
+
+@login_required
+@user_passes_test(is_admin)
+def export_trainees_csv(request):
+    q = request.GET.get('q', '')
+    batch_id = request.GET.get('batch', '')
+    trainees = TraineeProfile.objects.select_related('user', 'batch')
+    if q:
+        trainees = trainees.filter(Q(full_name__icontains=q) | Q(phone__icontains=q) | Q(user__username__icontains=q) | Q(user__email__icontains=q))
+    if batch_id:
+        trainees = trainees.filter(batch_id=batch_id)
+    response = HttpResponse(content_type='text/csv; charset=utf-8-sig')
+    response['Content-Disposition'] = 'attachment; filename="academy_trainees.csv"'
+    response.write('\ufeff')
+    writer = csv.writer(response)
+    writer.writerow(['الاسم الكامل', 'اسم المستخدم', 'رقم الجوال', 'البريد الإلكتروني', 'الدفعة', 'نسبة الحضور', 'تاريخ التسجيل'])
+    for t in trainees:
+        writer.writerow([t.full_name, t.user.username, t.phone, t.user.email, t.batch.name if t.batch else '', f'{t.attendance_rate}%', timezone.localtime(t.created_at).strftime('%Y-%m-%d %H:%M')])
+    return response
 
 
 @login_required
@@ -243,14 +390,15 @@ def filtered_attendance_queryset(request):
     q = request.GET.get('q', '')
     batch_id = request.GET.get('batch', '')
     status = request.GET.get('status', '')
-    date_from = request.GET.get('date_from', '')
-    date_to = request.GET.get('date_to', '')
+    today = timezone.localdate()
+    date_from = request.GET.get('date_from') or today.isoformat()
+    date_to = request.GET.get('date_to') or today.isoformat()
 
-    sessions = Session.objects.select_related('batch').all()
-    trainees = TraineeProfile.objects.select_related('user', 'batch').all()
+    sessions = Session.objects.select_related('batch').filter(is_active=True)
+    trainees = TraineeProfile.objects.select_related('user', 'batch')
 
     if q:
-        trainees = trainees.filter(Q(full_name__icontains=q) | Q(phone__icontains=q) | Q(user__username__icontains=q))
+        trainees = trainees.filter(Q(full_name__icontains=q) | Q(phone__icontains=q) | Q(user__username__icontains=q) | Q(user__email__icontains=q))
     if batch_id:
         sessions = sessions.filter(batch_id=batch_id)
         trainees = trainees.filter(batch_id=batch_id)
@@ -259,10 +407,22 @@ def filtered_attendance_queryset(request):
     if date_to:
         sessions = sessions.filter(date__lte=date_to)
 
+    sessions = list(sessions.order_by('-date', '-start_time')[:60])
+    trainees = list(trainees)
+    trainees_by_batch = defaultdict(list)
+    for trainee in trainees:
+        if trainee.batch_id:
+            trainees_by_batch[trainee.batch_id].append(trainee)
+
+    session_ids = [s.id for s in sessions]
+    trainee_ids = [t.id for t in trainees]
+    records = AttendanceRecord.objects.filter(session_id__in=session_ids, trainee_id__in=trainee_ids).select_related('trainee', 'session')
+    record_map = {(r.trainee_id, r.session_id): r for r in records}
+
     rows = []
-    for session in sessions.order_by('-date')[:100]:
-        for trainee in trainees.filter(batch=session.batch):
-            record = AttendanceRecord.objects.filter(session=session, trainee=trainee).first()
+    for session in sessions:
+        for trainee in trainees_by_batch.get(session.batch_id, []):
+            record = record_map.get((trainee.id, session.id))
             computed_status = record.status if record else 'absent'
             if status and computed_status != status:
                 continue
@@ -270,18 +430,58 @@ def filtered_attendance_queryset(request):
     return rows, {'q': q, 'batch': batch_id, 'status': status, 'date_from': date_from, 'date_to': date_to}
 
 
+def send_absence_notice(trainee, session, sender_user=None):
+    title = 'تنبيه غياب عن محاضرة'
+    body = f'نأمل الانتباه: لم يتم تسجيل حضورك في محاضرة "{session.title}" بتاريخ {session.date}. يرجى مراجعة الإدارة عند وجود عذر أو مشكلة تقنية.'
+    Notification.objects.create(recipient=trainee.user, title=title, body=body, session=session)
+    if trainee.user.email:
+        try:
+            send_mail(
+                subject=title,
+                message=body,
+                from_email=getattr(settings, 'DEFAULT_FROM_EMAIL', None),
+                recipient_list=[trainee.user.email],
+                fail_silently=True,
+            )
+        except Exception:
+            pass
+
+
 @login_required
 @user_passes_test(is_admin)
 def admin_attendance(request):
+    if request.method == 'POST':
+        action = request.POST.get('action')
+        if action == 'send_one':
+            trainee = get_object_or_404(TraineeProfile, pk=request.POST.get('trainee_id'))
+            session = get_object_or_404(Session, pk=request.POST.get('session_id'))
+            if not AttendanceRecord.objects.filter(trainee=trainee, session=session, status='present').exists():
+                send_absence_notice(trainee, session, request.user)
+                messages.success(request, f'تم إرسال تنبيه الغياب إلى {trainee.full_name}')
+            return redirect(request.get_full_path())
+        if action == 'send_all_absent':
+            rows, _ = filtered_attendance_queryset(request)
+            sent = 0
+            for row in rows:
+                if row['status'] == 'absent':
+                    send_absence_notice(row['trainee'], row['session'], request.user)
+                    sent += 1
+            messages.success(request, f'تم إرسال تنبيهات الغياب إلى {sent} متدرب/ـة.')
+            return redirect(request.get_full_path())
+
     rows, filters = filtered_attendance_queryset(request)
     present_count = sum(1 for r in rows if r['status'] == 'present')
     absent_count = sum(1 for r in rows if r['status'] == 'absent')
+    paginator = Paginator(rows, 120)
+    page_obj = paginator.get_page(request.GET.get('page'))
     return render(request, 'attendance/admin_attendance.html', {
-        'rows': rows,
+        'rows': page_obj.object_list,
+        'page_obj': page_obj,
         'filters': filters,
         'batches': Batch.objects.filter(is_active=True),
         'present_count': present_count,
         'absent_count': absent_count,
+        'total_count': len(rows),
     })
 
 
@@ -293,17 +493,18 @@ def export_attendance_csv(request):
     response['Content-Disposition'] = 'attachment; filename="academy_attendance.csv"'
     response.write('\ufeff')
     writer = csv.writer(response)
-    writer.writerow(['المتدرب', 'اسم المستخدم', 'الجوال', 'الدفعة', 'المحاضرة', 'التاريخ', 'الحالة', 'وقت التحضير', 'رابط زووم'])
+    writer.writerow(['المتدرب', 'اسم المستخدم', 'الجوال', 'البريد', 'الدفعة', 'المحاضرة', 'التاريخ', 'الحالة', 'وقت التحضير', 'رابط زووم'])
     for row in rows:
         record = row['record']
         writer.writerow([
             row['trainee'].full_name,
             row['trainee'].user.username,
             row['trainee'].phone,
+            row['trainee'].user.email,
             row['session'].batch.name,
             row['session'].title,
             row['session'].date,
-            'حاضر' if row['status'] == 'present' else 'غائب',
+            'حاضر' if row['status'] == 'present' else 'متأخر' if row['status'] == 'late' else 'غائب',
             timezone.localtime(record.checked_at).strftime('%Y-%m-%d %H:%M') if record else '-',
             record.zoom_url_snapshot if record else row['session'].zoom_url,
         ])
@@ -358,7 +559,8 @@ def trainee_home(request):
         custom = TraineeZoomLink.objects.filter(session=todays_session, trainee=profile).first()
         zoom_url = custom.zoom_url if custom else todays_session.zoom_url
     announcements = Announcement.objects.filter(is_active=True).filter(Q(audience='all') | Q(audience='trainee'))[:3]
-    total_sessions = profile.batch.sessions.count() if profile.batch else 0
+    notifications = Notification.objects.filter(recipient=request.user)[:6]
+    total_sessions = profile.batch.sessions.filter(is_active=True).count() if profile.batch else 0
     return render(request, 'attendance/trainee_home.html', {
         'profile': profile,
         'today': today,
@@ -367,6 +569,7 @@ def trainee_home(request):
         'zoom_url': zoom_url,
         'total_sessions': total_sessions,
         'announcements': announcements,
+        'notifications': notifications,
     })
 
 
@@ -398,8 +601,8 @@ def trainee_schedule(request):
         return redirect('admin_overview')
     profile = get_profile(request.user)
     sessions = Session.objects.filter(batch=profile.batch).order_by('-date') if profile.batch else []
-    records = {r.session_id: r for r in AttendanceRecord.objects.filter(trainee=profile)}
-    return render(request, 'attendance/trainee_schedule.html', {'profile': profile, 'sessions': sessions, 'records': records})
+    attended_ids = set(AttendanceRecord.objects.filter(trainee=profile).values_list('session_id', flat=True))
+    return render(request, 'attendance/trainee_schedule.html', {'profile': profile, 'sessions': sessions, 'attended_ids': attended_ids})
 
 
 @login_required

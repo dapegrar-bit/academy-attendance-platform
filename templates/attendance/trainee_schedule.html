@@ -3,6 +3,6 @@
 {% block content %}
 <div class="page-head"><div class="page-title"><h1>جدول المحاضرات</h1><p>كل محاضرات دفعتك التدريبية مرتبة زمنيًا</p></div></div>
 <div class="table-wrap"><table class="data-table"><thead><tr><th>المحاضرة</th><th>التاريخ</th><th>الوقت</th><th>الحالة</th></tr></thead><tbody>
-{% for s in sessions %}<tr><td>{{ s.title }}</td><td>{{ s.date }}</td><td>{% if s.start_time %}{{ s.start_time }}{% else %}—{% endif %}</td><td>{% if s.id in records %}<span class="badge">حاضر ✓</span>{% else %}<span class="badge absent">لم يحضر</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="4" class="muted" style="text-align:center;padding:55px">لا توجد محاضرات بعد</td></tr>{% endfor %}
+{% for s in sessions %}<tr><td>{{ s.title }}</td><td>{{ s.date }}</td><td>{% if s.start_time %}{{ s.start_time }}{% else %}—{% endif %}</td><td>{% if s.id in attended_ids %}<span class="badge">حاضر ✓</span>{% else %}<span class="badge absent">لم يحضر</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="4" class="muted" style="text-align:center;padding:55px">لا توجد محاضرات بعد</td></tr>{% endfor %}
 </tbody></table></div>
 {% endblock %}

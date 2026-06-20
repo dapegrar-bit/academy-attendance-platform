@@ -1,7 +1,13 @@
 {% extends 'attendance/base.html' %}
 {% block title %}سجلات الحضور{% endblock %}
 {% block content %}
-<div class="page-head"><div class="page-title"><h1>سجلات الحضور</h1><p>فلترة شاملة بالتاريخ والوقت والدفعة لمعرفة كل عمليات التحضير</p></div><a class="btn btn-soft" href="{% url 'export_attendance_csv' %}?q={{ filters.q }}&batch={{ filters.batch }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}">تصدير CSV ↓</a></div>
+<div class="page-head">
+  <div class="page-title"><h1>سجلات الحضور</h1><p>الافتراضي يعرض حضور اليوم فقط لتسريع النظام، ويمكنك تغيير التاريخ من الفلاتر</p></div>
+  <div class="actions">
+    <form method="post" class="inline-form">{% csrf_token %}<input type="hidden" name="action" value="send_all_absent"><button class="btn btn-accent" type="submit">إرسال تنبيه لكل الغائبين ✉</button></form>
+    <a class="btn btn-soft" href="{% url 'export_attendance_csv' %}?q={{ filters.q }}&batch={{ filters.batch }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}">تصدير CSV ↓</a>
+  </div>
+</div>
 <form class="filterbar" method="get">
   <input type="search" name="q" value="{{ filters.q }}" placeholder="بحث باسم المتدرب...">
   <select name="batch"><option value="">كل الدفعات</option>{% for b in batches %}<option value="{{ b.id }}" {% if filters.batch == b.id|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select>
@@ -10,8 +16,15 @@
   <select name="status"><option value="">كل الحالات</option><option value="present" {% if filters.status == 'present' %}selected{% endif %}>حاضر</option><option value="absent" {% if filters.status == 'absent' %}selected{% endif %}>غائب</option></select>
   <button class="btn btn-soft">تطبيق</button>
 </form>
-<div class="card" style="margin-bottom:16px"><span class="muted">عدد النتائج:</span> {{ rows|length }} • <span class="muted">حاضر:</span> {{ present_count }} • <span class="muted">غائب:</span> {{ absent_count }}</div>
-<div class="table-wrap"><table class="data-table"><thead><tr><th>المتدرب</th><th>الدفعة</th><th>المحاضرة</th><th>التاريخ</th><th>وقت التحضير</th><th>الحالة</th></tr></thead><tbody>
-{% for row in rows %}<tr><td>{{ row.trainee.full_name }}</td><td>{{ row.session.batch.name }}</td><td>{{ row.session.title }}</td><td>{{ row.session.date }}</td><td>{% if row.record %}{{ row.record.checked_at|date:'Y-m-d H:i' }}{% else %}—{% endif %}</td><td><span class="badge {% if row.status == 'absent' %}absent{% endif %}">{% if row.status == 'present' %}حاضر{% elif row.status == 'late' %}متأخر{% else %}غائب{% endif %}</span></td></tr>{% empty %}<tr><td colspan="6" class="muted" style="text-align:center;padding:55px">لا توجد نتائج مطابقة</td></tr>{% endfor %}
+<div class="card compact-card"><span class="muted">عدد النتائج:</span> {{ total_count }} • <span class="muted">حاضر:</span> {{ present_count }} • <span class="muted">غائب:</span> {{ absent_count }}</div>
+<div class="table-wrap"><table class="data-table"><thead><tr><th>المتدرب</th><th>الدفعة</th><th>المحاضرة</th><th>التاريخ</th><th>وقت التحضير</th><th>الحالة</th><th>تنبيه</th></tr></thead><tbody>
+{% for row in rows %}<tr><td>{{ row.trainee.full_name }}<br><small class="muted">{{ row.trainee.user.email|default:row.trainee.user.username }}</small></td><td>{{ row.session.batch.name }}</td><td>{{ row.session.title }}</td><td>{{ row.session.date }}</td><td>{% if row.record %}{{ row.record.checked_at|date:'Y-m-d H:i' }}{% else %}—{% endif %}</td><td><span class="badge {% if row.status == 'absent' %}absent{% endif %}">{% if row.status == 'present' %}حاضر{% elif row.status == 'late' %}متأخر{% else %}غائب{% endif %}</span></td><td>{% if row.status == 'absent' %}<form method="post" class="inline-form">{% csrf_token %}<input type="hidden" name="action" value="send_one"><input type="hidden" name="trainee_id" value="{{ row.trainee.id }}"><input type="hidden" name="session_id" value="{{ row.session.id }}"><button class="btn btn-small btn-accent" type="submit">إرسال ✉</button></form>{% else %}<span class="muted">—</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="7" class="muted" style="text-align:center;padding:55px">لا توجد نتائج مطابقة</td></tr>{% endfor %}
 </tbody></table></div>
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+  <div class="pagination">
+    {% if page_obj.has_previous %}<a class="btn btn-soft" href="?q={{ filters.q }}&batch={{ filters.batch }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&page={{ page_obj.previous_page_number }}">السابق</a>{% endif %}
+    <span>صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}<a class="btn btn-soft" href="?q={{ filters.q }}&batch={{ filters.batch }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}&page={{ page_obj.next_page_number }}">التالي</a>{% endif %}
+  </div>
+{% endif %}
 {% endblock %}

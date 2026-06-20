@@ -1,24 +1,50 @@
 {% extends 'attendance/base.html' %}
 {% block title %}المتدربون{% endblock %}
 {% block content %}
-<div class="page-head"><div class="page-title"><h1>المتدربون</h1><p>إدارة جميع المتدربين المسجلين في النظام وإضافة متدربين جدد يدويًا</p></div></div>
-<div class="modal-like">
-  <h2>{% if edit_instance %}تعديل بيانات متدرب{% else %}إضافة متدرب{% endif %}</h2>
-  <form method="post">
-    {% csrf_token %}{% if edit_instance %}<input type="hidden" name="trainee_id" value="{{ edit_instance.id }}">{% endif %}
-    <div class="form-row"><div class="field"><label>اسم المتدرب</label>{{ form.full_name }}</div><div class="field"><label>اسم المستخدم</label>{{ form.username }}</div></div>
-    <div class="form-row"><div class="field"><label>رقم الجوال</label>{{ form.phone }}</div><div class="field"><label>البريد الإلكتروني</label>{{ form.email }}</div></div>
-    <div class="form-row"><div class="field"><label>الدفعة</label>{{ form.batch }}</div><div class="field"><label>كلمة المرور</label>{{ form.password }}</div></div>
-    {{ form.errors }}
-    <button class="btn btn-block" type="submit">حفظ المتدرب</button>
-  </form>
+<div class="page-head"><div class="page-title"><h1>المتدربون</h1><p>إدارة المتدربين يدويًا أو عبر Excel، مع تصدير البيانات إلى جهازك</p></div><a class="btn btn-soft" href="{% url 'export_trainees_csv' %}?q={{ q }}&batch={{ selected_batch }}">تصدير المتدربين CSV ↓</a></div>
+
+<div class="grid grid-2 form-panels">
+  <div class="modal-like no-margin">
+    <h2>{% if edit_instance %}تعديل بيانات متدرب{% else %}إضافة متدرب يدويًا{% endif %}</h2>
+    <form method="post">
+      {% csrf_token %}<input type="hidden" name="action" value="manual">{% if edit_instance %}<input type="hidden" name="trainee_id" value="{{ edit_instance.id }}">{% endif %}
+      <div class="form-row"><div class="field"><label>اسم المتدرب</label>{{ form.full_name }}</div><div class="field"><label>اسم المستخدم</label>{{ form.username }}</div></div>
+      <div class="form-row"><div class="field"><label>رقم الجوال</label>{{ form.phone }}</div><div class="field"><label>البريد الإلكتروني</label>{{ form.email }}</div></div>
+      <div class="form-row"><div class="field"><label>الدفعة</label>{{ form.batch }}</div><div class="field"><label>كلمة المرور</label>{{ form.password }}</div></div>
+      {{ form.errors }}
+      <div class="actions"><button class="btn" type="submit">حفظ المتدرب</button>{% if edit_instance %}<a class="btn btn-soft" href="{% url 'admin_trainees' %}">إلغاء التعديل</a>{% endif %}</div>
+    </form>
+  </div>
+
+  <div class="modal-like no-margin">
+    <h2>استيراد متدربين من Excel</h2>
+    <p class="muted">أعمدة الملف المطلوبة: الاسم الكامل، اسم المستخدم، رقم الجوال، البريد الإلكتروني، الدفعة، كلمة المرور.</p>
+    <form method="post" enctype="multipart/form-data">
+      {% csrf_token %}<input type="hidden" name="action" value="import">
+      <div class="field"><label>ملف Excel بصيغة xlsx</label>{{ import_form.excel_file }}{{ import_form.excel_file.errors }}</div>
+      <div class="field"><label>دفعة افتراضية</label>{{ import_form.default_batch }}</div>
+      <div class="field"><label>كلمة مرور موحدة عند عدم وجودها في الملف</label>{{ import_form.default_password }}</div>
+      <div class="field check-field"><label>{{ import_form.update_existing }} تحديث الموجود مسبقًا</label></div>
+      {{ import_form.errors }}
+      <button class="btn btn-block" type="submit">رفع وإنشاء الحسابات</button>
+    </form>
+  </div>
 </div>
+
 <form method="get" class="filterbar wide-filter">
-  <input type="search" name="q" value="{{ q }}" placeholder="بحث بالاسم أو اسم المستخدم...">
+  <input type="search" name="q" value="{{ q }}" placeholder="بحث بالاسم أو اسم المستخدم أو البريد...">
   <select name="batch"><option value="">كل الدفعات</option>{% for b in batches %}<option value="{{ b.id }}" {% if selected_batch == b.id|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select>
   <button class="btn btn-soft">بحث</button>
 </form>
-<div class="table-wrap"><table class="data-table"><thead><tr><th>المتدرب</th><th>اسم المستخدم</th><th>الجوال</th><th>الدفعة</th><th>نسبة الحضور</th><th>إجراءات</th></tr></thead><tbody>
-{% for t in trainees %}<tr><td><span class="avatar" style="display:inline-grid;margin-left:8px">{{ t.initials }}</span>{{ t.full_name }}</td><td><span class="badge gray">{{ t.user.username }}</span></td><td>{{ t.phone|default:'—' }}</td><td><span class="badge gray">{{ t.batch.name|default:'بدون دفعة' }}</span></td><td><span class="badge {% if t.attendance_rate == 0 %}absent{% endif %}">{{ t.attendance_rate }}%</span></td><td><div class="actions"><a class="btn btn-small btn-soft" href="?edit={{ t.id }}">✎</a><form method="post" action="{% url 'delete_trainee' t.id %}">{% csrf_token %}<button class="btn btn-small btn-danger">حذف</button></form></div></td></tr>{% empty %}<tr><td colspan="6" class="muted" style="text-align:center;padding:55px">لا يوجد متدربون</td></tr>{% endfor %}
+<div class="card compact-card"><span class="muted">المعروض:</span> {{ trainees|length }} <span class="muted">من أصل النتائج</span> {% if page_obj %}{{ page_obj.paginator.count }}{% endif %}</div>
+<div class="table-wrap"><table class="data-table"><thead><tr><th>المتدرب</th><th>اسم المستخدم</th><th>الجوال</th><th>البريد</th><th>الدفعة</th><th>نسبة الحضور</th><th>إجراءات</th></tr></thead><tbody>
+{% for t in trainees %}<tr><td><span class="avatar inline-avatar">{{ t.initials }}</span>{{ t.full_name }}</td><td><span class="badge gray">{{ t.user.username }}</span></td><td>{{ t.phone|default:'—' }}</td><td>{{ t.user.email|default:'—' }}</td><td><span class="badge gray">{{ t.batch.name|default:'بدون دفعة' }}</span></td><td><span class="badge {% if t.attendance_rate == 0 %}absent{% endif %}">{{ t.attendance_rate }}%</span></td><td><div class="actions"><a class="btn btn-small btn-soft" href="?edit={{ t.id }}">✎</a><form method="post" action="{% url 'delete_trainee' t.id %}" onsubmit="return confirm('تأكيد حذف المتدرب؟')">{% csrf_token %}<button class="btn btn-small btn-danger">حذف</button></form></div></td></tr>{% empty %}<tr><td colspan="7" class="muted" style="text-align:center;padding:55px">لا يوجد متدربون</td></tr>{% endfor %}
 </tbody></table></div>
+{% if page_obj and page_obj.paginator.num_pages > 1 %}
+  <div class="pagination">
+    {% if page_obj.has_previous %}<a class="btn btn-soft" href="?q={{ q }}&batch={{ selected_batch }}&page={{ page_obj.previous_page_number }}">السابق</a>{% endif %}
+    <span>صفحة {{ page_obj.number }} من {{ page_obj.paginator.num_pages }}</span>
+    {% if page_obj.has_next %}<a class="btn btn-soft" href="?q={{ q }}&batch={{ selected_batch }}&page={{ page_obj.next_page_number }}">التالي</a>{% endif %}
+  </div>
+{% endif %}
 {% endblock %}

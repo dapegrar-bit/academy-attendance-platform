@@ -65,4 +65,4 @@ class Command(BaseCommand):
             AttendanceRecord.objects.get_or_create(trainee=sara, session=session, defaults={'status': 'present', 'zoom_url_snapshot': session.zoom_url})
 
         Announcement.objects.get_or_create(title='مرحبًا بكم في أكاديميتي', defaults={'body': 'يرجى الضغط على زر التحضير قبل فتح رابط زووم لضمان تسجيل حضوركم.', 'audience': 'all'})
-        self.stdout.write(self.style.SUCCESS('Demo data is ready. Admin: admin/admin123 - Trainee: sara/1234'))
+        self.stdout.write(self.style.SUCCESS('Demo data is ready.'))

@@ -1,5 +1,5 @@
 from django.contrib import admin
-from .models import Batch, TraineeProfile, Session, TraineeZoomLink, AttendanceRecord, Announcement, SiteSetting
+from .models import Batch, TraineeProfile, Session, TraineeZoomLink, AttendanceRecord, Announcement, SiteSetting, Notification
 
 
 @admin.register(Batch)
@@ -45,3 +45,10 @@ class AnnouncementAdmin(admin.ModelAdmin):
 @admin.register(SiteSetting)
 class SiteSettingAdmin(admin.ModelAdmin):
     list_display = ('academy_name', 'system_name', 'primary_color', 'accent_color')
+
+
+@admin.register(Notification)
+class NotificationAdmin(admin.ModelAdmin):
+    list_display = ('title', 'recipient', 'session', 'is_read', 'created_at')
+    search_fields = ('title', 'body', 'recipient__username', 'recipient__first_name')
+    list_filter = ('is_read', 'created_at')

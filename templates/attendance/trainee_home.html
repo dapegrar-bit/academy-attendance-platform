@@ -28,5 +28,6 @@
     <div class="empty"><div><div class="icon">▣</div><h2>لا توجد محاضرة فعالة اليوم</h2><p>سيظهر زر التحضير عند إضافة الإدارة لمحاضرة اليوم.</p></div></div>
   {% endif %}
 </div>
-{% if announcements %}<div class="card" style="margin-top:18px"><h2>تنبيهات</h2>{% for a in announcements %}<div class="about-card"><strong>{{ a.title }}</strong><p class="muted">{{ a.body }}</p></div>{% endfor %}</div>{% endif %}
+{% if notifications %}<div class="card" style="margin-top:18px"><h2>رسائل وتنبيهات الإدارة</h2>{% for n in notifications %}<div class="about-card {% if not n.is_read %}unread{% endif %}"><strong>{{ n.title }}</strong><p class="muted">{{ n.body }}</p><small class="muted">{{ n.created_at|date:'Y-m-d H:i' }}</small></div>{% endfor %}</div>{% endif %}
+{% if announcements %}<div class="card" style="margin-top:18px"><h2>إعلانات عامة</h2>{% for a in announcements %}<div class="about-card"><strong>{{ a.title }}</strong><p class="muted">{{ a.body }}</p></div>{% endfor %}</div>{% endif %}
 {% endblock %}
