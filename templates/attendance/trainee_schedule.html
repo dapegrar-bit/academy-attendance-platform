@@ -1,8 +1,24 @@
 {% extends 'attendance/base.html' %}
 {% block title %}جدول المحاضرات{% endblock %}
 {% block content %}
-<div class="page-head"><div class="page-title"><h1>جدول المحاضرات</h1><p>كل محاضرات دفعتك التدريبية مرتبة زمنيًا</p></div></div>
-<div class="table-wrap"><table class="data-table"><thead><tr><th>المحاضرة</th><th>التاريخ</th><th>الوقت</th><th>الحالة</th></tr></thead><tbody>
-{% for s in sessions %}<tr><td>{{ s.title }}</td><td>{{ s.date }}</td><td>{% if s.start_time %}{{ s.start_time }}{% else %}—{% endif %}</td><td>{% if s.id in attended_ids %}<span class="badge">حاضر ✓</span>{% else %}<span class="badge absent">لم يحضر</span>{% endif %}</td></tr>{% empty %}<tr><td colspan="4" class="muted" style="text-align:center;padding:55px">لا توجد محاضرات بعد</td></tr>{% endfor %}
+<div class="page-head"><div class="page-title"><h1>جدول المحاضرات</h1><p>كل محاضرات دفعتك التدريبية مرتبة زمنيًا، ويمكن تحضير محاضرات اليوم كل واحدة على حدة</p></div></div>
+<div class="table-wrap"><table class="data-table"><thead><tr><th>المحاضرة</th><th>التاريخ</th><th>الوقت</th><th>الحالة</th><th>إجراء</th></tr></thead><tbody>
+{% for s in sessions %}
+<tr>
+  <td>{% if s.date == today %}<span class="badge today">اليوم</span>{% endif %} {{ s.title }}</td>
+  <td>{{ s.date }}</td>
+  <td>{% if s.start_time %}{{ s.start_time }}{% else %}—{% endif %}{% if s.end_time %} - {{ s.end_time }}{% endif %}</td>
+  <td>{% if s.id in attended_ids %}<span class="badge">حاضر ✓</span>{% else %}<span class="badge absent">لم يحضر</span>{% endif %}</td>
+  <td>
+    {% if s.date == today and s.id not in attended_ids %}
+      <form method="post" action="{% url 'check_in' s.id %}" class="inline-form">{% csrf_token %}<button class="btn btn-small btn-accent" type="submit">تحضير</button></form>
+    {% elif s.id in attended_ids %}
+      <span class="muted">تم التسجيل</span>
+    {% else %}
+      <span class="muted">—</span>
+    {% endif %}
+  </td>
+</tr>
+{% empty %}<tr><td colspan="5" class="muted" style="text-align:center;padding:55px">لا توجد محاضرات بعد</td></tr>{% endfor %}
 </tbody></table></div>
 {% endblock %}

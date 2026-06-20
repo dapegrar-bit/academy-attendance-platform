@@ -550,23 +550,43 @@ def trainee_home(request):
         return redirect('admin_overview')
     profile = get_profile(request.user)
     today = timezone.localdate()
-    todays_session = None
+
+    todays_sessions = []
+    today_session_rows = []
     if profile.batch:
-        todays_session = Session.objects.filter(batch=profile.batch, date=today, is_active=True).order_by('start_time').first()
-    record = AttendanceRecord.objects.filter(trainee=profile, session=todays_session).first() if todays_session else None
-    zoom_url = None
-    if record:
-        custom = TraineeZoomLink.objects.filter(session=todays_session, trainee=profile).first()
-        zoom_url = custom.zoom_url if custom else todays_session.zoom_url
+        todays_sessions = list(
+            Session.objects.filter(batch=profile.batch, date=today, is_active=True)
+            .order_by('start_time', 'id')
+        )
+
+    if todays_sessions:
+        session_ids = [session.id for session in todays_sessions]
+        records = AttendanceRecord.objects.filter(trainee=profile, session_id__in=session_ids)
+        record_map = {record.session_id: record for record in records}
+        custom_links = TraineeZoomLink.objects.filter(trainee=profile, session_id__in=session_ids)
+        custom_link_map = {link.session_id: link.zoom_url for link in custom_links}
+
+        for session in todays_sessions:
+            record = record_map.get(session.id)
+            zoom_url = custom_link_map.get(session.id) or session.zoom_url
+            today_session_rows.append({
+                'session': session,
+                'record': record,
+                'zoom_url': zoom_url if record else '',
+                'raw_zoom_url': zoom_url,
+            })
+
     announcements = Announcement.objects.filter(is_active=True).filter(Q(audience='all') | Q(audience='trainee'))[:3]
     notifications = Notification.objects.filter(recipient=request.user)[:6]
     total_sessions = profile.batch.sessions.filter(is_active=True).count() if profile.batch else 0
+    attended_today_count = sum(1 for row in today_session_rows if row['record'])
+
     return render(request, 'attendance/trainee_home.html', {
         'profile': profile,
         'today': today,
-        'todays_session': todays_session,
-        'record': record,
-        'zoom_url': zoom_url,
+        'todays_sessions': todays_sessions,
+        'today_session_rows': today_session_rows,
+        'attended_today_count': attended_today_count,
         'total_sessions': total_sessions,
         'announcements': announcements,
         'notifications': notifications,
@@ -600,9 +620,15 @@ def trainee_schedule(request):
     if request.user.is_staff:
         return redirect('admin_overview')
     profile = get_profile(request.user)
-    sessions = Session.objects.filter(batch=profile.batch).order_by('-date') if profile.batch else []
+    sessions = list(Session.objects.filter(batch=profile.batch).order_by('-date', '-start_time', '-id')) if profile.batch else []
     attended_ids = set(AttendanceRecord.objects.filter(trainee=profile).values_list('session_id', flat=True))
-    return render(request, 'attendance/trainee_schedule.html', {'profile': profile, 'sessions': sessions, 'attended_ids': attended_ids})
+    today = timezone.localdate()
+    return render(request, 'attendance/trainee_schedule.html', {
+        'profile': profile,
+        'sessions': sessions,
+        'attended_ids': attended_ids,
+        'today': today,
+    })
 
 
 @login_required
