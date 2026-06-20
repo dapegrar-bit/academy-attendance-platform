@@ -1,0 +1,12 @@
+{% extends 'attendance/base.html' %}
+{% block title %}سجل حضوري{% endblock %}
+{% block content %}
+<div class="page-head"><div class="page-title"><h1>سجل حضوري</h1><p>تتبع التزامك بالمحاضرات شهرًا بشهر</p></div></div>
+<div class="card">
+  <div class="section-title"><a class="btn btn-soft" href="?year={{ prev_year }}&month={{ prev_month }}">الشهر السابق ›</a><h2>{{ month_name }} {{ year }}</h2><a class="btn btn-soft" href="?year={{ next_year }}&month={{ next_month }}">‹ الشهر التالي</a></div>
+  <div class="calendar-grid">
+    <div class="calendar-dayname">أحد</div><div class="calendar-dayname">إثنين</div><div class="calendar-dayname">ثلاثاء</div><div class="calendar-dayname">أربعاء</div><div class="calendar-dayname">خميس</div><div class="calendar-dayname">جمعة</div><div class="calendar-dayname">سبت</div>
+    {% for week in weeks %}{% for day in week %}<div class="calendar-cell {% if day.month != month %}out{% endif %} {% if day.day in present_days and day.month == month %}present{% endif %}"><strong>{{ day.day }}</strong>{% if day.day in present_days and day.month == month %}<br><span class="badge">حاضر</span>{% endif %}</div>{% endfor %}{% endfor %}
+  </div>
+</div>
+{% endblock %}

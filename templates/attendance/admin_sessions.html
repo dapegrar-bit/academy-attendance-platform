@@ -1,0 +1,21 @@
+{% extends 'attendance/base.html' %}
+{% block title %}المحاضرات وروابط الزووم{% endblock %}
+{% block content %}
+<div class="page-head"><div class="page-title"><h1>المحاضرات وروابط الزووم</h1><p>أضف محاضرة لكل يوم، واجعل الرابط يظهر للمتدرب بعد التحضير تلقائيًا</p></div></div>
+<div class="modal-like">
+  <h2>{% if edit_instance %}تعديل محاضرة{% else %}إضافة محاضرة{% endif %}</h2>
+  <form method="post">
+    {% csrf_token %}{% if edit_instance %}<input type="hidden" name="session_id" value="{{ edit_instance.id }}">{% endif %}
+    <div class="form-row"><div class="field"><label>الدفعة</label>{{ form.batch }}</div><div class="field"><label>عنوان المحاضرة</label>{{ form.title }}</div></div>
+    <div class="field"><label>الوصف</label>{{ form.description }}</div>
+    <div class="form-row"><div class="field"><label>التاريخ</label>{{ form.date }}</div><div class="field"><label>رابط زووم</label>{{ form.zoom_url }}</div></div>
+    <div class="form-row"><div class="field"><label>بداية</label>{{ form.start_time }}</div><div class="field"><label>نهاية</label>{{ form.end_time }}</div></div>
+    <div class="field"><label>{{ form.is_active }} فعالة</label></div>
+    <button class="btn btn-block" type="submit">حفظ المحاضرة</button>
+  </form>
+</div>
+<form class="filterbar wide-filter" method="get"><select name="batch"><option value="">كل الدفعات</option>{% for b in batches %}<option value="{{ b.id }}" {% if selected_batch == b.id|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select><button class="btn btn-soft">فلترة</button></form>
+<div class="table-wrap"><table class="data-table"><thead><tr><th>المحاضرة</th><th>الدفعة</th><th>التاريخ</th><th>رابط الزووم</th><th>الحضور</th><th>إجراءات</th></tr></thead><tbody>
+{% for s in sessions %}<tr><td>{% if s.date == today %}<span class="badge today">اليوم</span>{% endif %} {{ s.title }}</td><td>{{ s.batch.name }}</td><td>{{ s.date }}</td><td class="muted">{{ s.zoom_url|truncatechars:38 }}</td><td><span class="badge">{{ s.attendance_ratio_text }}</span></td><td><div class="actions"><a class="btn btn-small btn-soft" href="?edit={{ s.id }}">✎</a><form method="post" action="{% url 'delete_session' s.id %}">{% csrf_token %}<button class="btn btn-small btn-danger">حذف</button></form></div></td></tr>{% empty %}<tr><td colspan="6" class="muted" style="text-align:center;padding:55px">لا توجد محاضرات</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

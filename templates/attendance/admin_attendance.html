@@ -1,0 +1,17 @@
+{% extends 'attendance/base.html' %}
+{% block title %}سجلات الحضور{% endblock %}
+{% block content %}
+<div class="page-head"><div class="page-title"><h1>سجلات الحضور</h1><p>فلترة شاملة بالتاريخ والوقت والدفعة لمعرفة كل عمليات التحضير</p></div><a class="btn btn-soft" href="{% url 'export_attendance_csv' %}?q={{ filters.q }}&batch={{ filters.batch }}&status={{ filters.status }}&date_from={{ filters.date_from }}&date_to={{ filters.date_to }}">تصدير CSV ↓</a></div>
+<form class="filterbar" method="get">
+  <input type="search" name="q" value="{{ filters.q }}" placeholder="بحث باسم المتدرب...">
+  <select name="batch"><option value="">كل الدفعات</option>{% for b in batches %}<option value="{{ b.id }}" {% if filters.batch == b.id|stringformat:'s' %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select>
+  <input type="date" name="date_from" value="{{ filters.date_from }}">
+  <input type="date" name="date_to" value="{{ filters.date_to }}">
+  <select name="status"><option value="">كل الحالات</option><option value="present" {% if filters.status == 'present' %}selected{% endif %}>حاضر</option><option value="absent" {% if filters.status == 'absent' %}selected{% endif %}>غائب</option></select>
+  <button class="btn btn-soft">تطبيق</button>
+</form>
+<div class="card" style="margin-bottom:16px"><span class="muted">عدد النتائج:</span> {{ rows|length }} • <span class="muted">حاضر:</span> {{ present_count }} • <span class="muted">غائب:</span> {{ absent_count }}</div>
+<div class="table-wrap"><table class="data-table"><thead><tr><th>المتدرب</th><th>الدفعة</th><th>المحاضرة</th><th>التاريخ</th><th>وقت التحضير</th><th>الحالة</th></tr></thead><tbody>
+{% for row in rows %}<tr><td>{{ row.trainee.full_name }}</td><td>{{ row.session.batch.name }}</td><td>{{ row.session.title }}</td><td>{{ row.session.date }}</td><td>{% if row.record %}{{ row.record.checked_at|date:'Y-m-d H:i' }}{% else %}—{% endif %}</td><td><span class="badge {% if row.status == 'absent' %}absent{% endif %}">{% if row.status == 'present' %}حاضر{% elif row.status == 'late' %}متأخر{% else %}غائب{% endif %}</span></td></tr>{% empty %}<tr><td colspan="6" class="muted" style="text-align:center;padding:55px">لا توجد نتائج مطابقة</td></tr>{% endfor %}
+</tbody></table></div>
+{% endblock %}

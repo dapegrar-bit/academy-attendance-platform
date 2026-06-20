@@ -1,0 +1,27 @@
+{% extends 'attendance/base.html' %}
+{% block title %}الدفعات التدريبية{% endblock %}
+{% block content %}
+<div class="page-head"><div class="page-title"><h1>الدفعات التدريبية</h1><p>أنشئ روابط دفعات للمتدربين؛ كل دفعة لها محاضراتها وروابطها الخاصة</p></div></div>
+<div class="modal-like">
+  <h2>{% if edit_instance %}تعديل دفعة تدريبية{% else %}دفعة تدريبية جديدة{% endif %}</h2>
+  <form method="post">
+    {% csrf_token %}{% if edit_instance %}<input type="hidden" name="batch_id" value="{{ edit_instance.id }}">{% endif %}
+    <div class="field"><label>اسم الدفعة</label>{{ form.name }}{{ form.name.errors }}</div>
+    <div class="field"><label>وصف مختصر</label>{{ form.description }}</div>
+    <div class="field color-options"><label>لون الدفعة</label>{{ form.color }}</div>
+    <div class="field"><label>{{ form.is_active }} نشطة</label></div>
+    <button class="btn btn-block" type="submit">{% if edit_instance %}حفظ التعديل{% else %}إنشاء الدفعة{% endif %}</button>
+  </form>
+</div>
+<div class="grid grid-2">
+  {% for batch in batches %}
+    <div class="card">
+      <div class="section-title"><h2>{{ batch.name }}</h2><span class="badge" style="background:{{ batch.color }}">{{ batch.attendance_rate }}%</span></div>
+      <p class="muted">{{ batch.description|default:'بدون وصف' }}</p>
+      <hr style="border-color:#1d3d30;border-style:solid;border-width:1px 0 0;margin:18px 0">
+      <div class="grid grid-3"><div><strong>{{ batch.trainees_count }}</strong><br><span class="muted">متدرب</span></div><div><strong>{{ batch.sessions_count }}</strong><br><span class="muted">محاضرة</span></div><div><strong>{{ batch.attendance_rate }}%</strong><br><span class="muted">معدل الحضور</span></div></div>
+      <div class="actions" style="margin-top:16px"><a class="btn btn-small btn-soft" href="?edit={{ batch.id }}">✎ تعديل</a><form method="post" action="{% url 'delete_batch' batch.id %}">{% csrf_token %}<button class="btn btn-small btn-danger">حذف</button></form></div>
+    </div>
+  {% empty %}<div class="card empty"><div><div class="icon">▰</div>لا توجد دفعات</div></div>{% endfor %}
+</div>
+{% endblock %}

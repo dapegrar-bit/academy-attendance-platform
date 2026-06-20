@@ -1,0 +1,17 @@
+{% extends 'attendance/base.html' %}
+{% block title %}التقارير والإحصاءات{% endblock %}
+{% block content %}
+<div class="page-head"><div class="page-title"><h1>التقارير والإحصاءات</h1><p>تحليل أداء الدفعات والمتدربين على مدار البرنامج</p></div></div>
+<form class="filterbar wide-filter" method="get"><select name="batch"><option value="">كل الدفعات</option>{% for b in batches %}<option value="{{ b.id }}" {% if selected_batch and selected_batch.id == b.id %}selected{% endif %}>{{ b.name }}</option>{% endfor %}</select><button class="btn btn-soft">عرض</button></form>
+{% if selected_batch %}
+<div class="card">
+  <div class="section-title"><h2>{{ selected_batch.name }}</h2><span class="badge">{{ total_rate }}% معدل الحضور</span></div>
+  <p class="muted">{{ selected_batch.trainees_count }} متدرب • {{ selected_batch.sessions_count }} محاضرة معتمدة</p>
+  <div class="progress"><span style="width:{{ total_rate }}%"></span></div>
+  <div class="grid grid-2" style="margin-top:24px">
+    <div><h2>الأعلى أداءً</h2>{% for p in top %}<div class="about-card"><span class="badge gray">#{{ forloop.counter }}</span> {{ p.full_name }} <span style="float:left" class="badge">{{ p.attendance_rate }}%</span></div>{% empty %}<p class="muted">لا يوجد بيانات.</p>{% endfor %}</div>
+    <div><h2>بحاجة لمتابعة</h2>{% for p in low %}<div class="about-card"><span class="badge absent">{{ p.attendance_rate }}%</span> {{ p.full_name }}</div>{% empty %}<p class="muted">لا توجد حالات منخفضة.</p>{% endfor %}</div>
+  </div>
+</div>
+{% else %}<div class="card empty"><div><div class="icon">▥</div>لا توجد دفعات للتقرير</div></div>{% endif %}
+{% endblock %}

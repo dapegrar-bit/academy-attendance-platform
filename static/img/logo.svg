@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="380" height="170" viewBox="0 0 380 170">
+  <rect width="380" height="170" fill="none"/>
+  <g fill="#2f7d6f">
+    <path d="M275 48h50v14h-36v20h26v14h-26v26h-14z"/>
+    <path d="M333 48h14v74h-14z" opacity=".75"/>
+  </g>
+  <text x="188" y="78" text-anchor="middle" font-size="36" font-weight="700" font-family="Tahoma, Arial" fill="#2f7d6f">أكاديميتي</text>
+  <text x="188" y="112" text-anchor="middle" font-size="14" font-family="Tahoma, Arial" fill="#86bbae">حضور وغياب • محاضرات</text>
+</svg>

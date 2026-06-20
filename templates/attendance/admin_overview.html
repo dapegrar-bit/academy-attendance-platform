@@ -1,0 +1,33 @@
+{% extends 'attendance/base.html' %}
+{% block title %}نظرة عامة | الإدارة{% endblock %}
+{% block content %}
+<div class="page-head">
+  <div class="page-title"><h1>نظرة عامة</h1><p>الجمعة، {{ today }} — ملخص أداء أكاديميتي اليوم</p></div>
+  <a href="{% url 'admin_sessions' %}" class="btn">+ إضافة محاضرة اليوم</a>
+</div>
+<div class="grid grid-4">
+  <div class="card stat-card"><div class="stat-icon">▥</div><div><div class="stat-value">{{ today_rate }}%</div><div class="stat-label">معدل الحضور العام</div></div><div class="progress"><span style="width:{{ today_rate }}%"></span></div></div>
+  <div class="card stat-card"><div class="stat-icon" style="color:var(--accent)">▣</div><div><div class="stat-value">{{ sessions_today_count }}</div><div class="stat-label">محاضرة مضافة اليوم</div></div></div>
+  <div class="card stat-card"><div class="stat-icon">👥</div><div><div class="stat-value">{{ trainees_count }}</div><div class="stat-label">متدرب مسجل</div></div></div>
+  <div class="card stat-card"><div class="stat-icon">▰</div><div><div class="stat-value">{{ batches_count }}</div><div class="stat-label">دفعة تدريبية</div></div></div>
+</div>
+<div class="grid grid-2" style="margin-top:18px">
+  <div class="card">
+    <div class="section-title"><h2>حالة الدفعات اليوم</h2><span class="badge gray">{{ batches_count }} دفعة</span></div>
+    {% for batch in batch_stats %}
+      <div class="about-card">
+        <strong>{{ batch.name }}</strong>
+        <p class="muted">{{ batch.trainees_count }} متدرب • {{ batch.sessions_count }} محاضرة • معدل {{ batch.attendance_rate }}%</p>
+        <div class="progress"><span style="width:{{ batch.attendance_rate }}%;background:{{ batch.color }}"></span></div>
+      </div>
+    {% empty %}<div class="empty"><div><div class="icon">▢</div>لا توجد دفعات بعد</div></div>{% endfor %}
+  </div>
+  <div class="card">
+    <div class="section-title"><h2>آخر عمليات التحضير</h2><span class="muted">مباشر</span></div>
+    <div class="table-wrap"><table class="data-table"><thead><tr><th>المتدرب</th><th>المحاضرة</th><th>الوقت</th><th>الحالة</th></tr></thead><tbody>
+      {% for rec in recent_attendance %}<tr><td>{{ rec.trainee.full_name }}</td><td>{{ rec.session.title }}</td><td>{{ rec.checked_at|date:'H:i' }}</td><td><span class="badge">{{ rec.get_status_display }}</span></td></tr>
+      {% empty %}<tr><td colspan="4" class="muted" style="text-align:center;padding:60px">لا توجد عمليات تحضير اليوم بعد</td></tr>{% endfor %}
+    </tbody></table></div>
+  </div>
+</div>
+{% endblock %}

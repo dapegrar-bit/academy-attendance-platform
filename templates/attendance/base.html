@@ -1,0 +1,58 @@
+{% load static %}
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}أكاديميتي{% endblock %}</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body>
+  <aside class="sidebar">
+    <a class="brand" href="{% url 'home' %}">
+      <img src="{% if brand.logo_url %}{{ brand.logo_url }}{% else %}{% static 'img/logo.svg' %}{% endif %}" alt="الشعار">
+      <span>
+        <strong>{{ brand.system_name|default:'النظام الشامل للتحكم' }}</strong>
+        <span>حضور وغياب • محاضرات</span>
+      </span>
+    </a>
+    {% if user.is_staff %}
+      <a class="nav-link {% if request.resolver_match.url_name == 'admin_overview' %}active{% endif %}" href="{% url 'admin_overview' %}">⌂ نظرة عامة</a>
+      <a class="nav-link {% if request.resolver_match.url_name == 'admin_batches' %}active{% endif %}" href="{% url 'admin_batches' %}">▰ الدفعات</a>
+      <a class="nav-link {% if request.resolver_match.url_name == 'admin_trainees' %}active{% endif %}" href="{% url 'admin_trainees' %}">👥 المتدربون</a>
+      <a class="nav-link {% if request.resolver_match.url_name == 'admin_sessions' %}active{% endif %}" href="{% url 'admin_sessions' %}">▣ المحاضرات والروابط</a>
+      <a class="nav-link {% if request.resolver_match.url_name == 'admin_attendance' %}active{% endif %}" href="{% url 'admin_attendance' %}">▤ سجلات الحضور</a>
+      <a class="nav-link {% if request.resolver_match.url_name == 'admin_reports' %}active{% endif %}" href="{% url 'admin_reports' %}">▥ التقارير</a>
+      <div class="nav-section">النظام</div>
+      <a class="nav-link {% if request.resolver_match.url_name == 'admin_settings' %}active{% endif %}" href="{% url 'admin_settings' %}">⚙ الإعدادات</a>
+    {% else %}
+      <a class="nav-link {% if request.resolver_match.url_name == 'trainee_home' %}active{% endif %}" href="{% url 'trainee_home' %}">⌂ الرئيسية</a>
+      <a class="nav-link {% if request.resolver_match.url_name == 'trainee_calendar' %}active{% endif %}" href="{% url 'trainee_calendar' %}">▣ سجل حضوري</a>
+      <a class="nav-link {% if request.resolver_match.url_name == 'trainee_schedule' %}active{% endif %}" href="{% url 'trainee_schedule' %}">▤ جدول المحاضرات</a>
+      <a class="nav-link {% if request.resolver_match.url_name == 'trainee_profile' %}active{% endif %}" href="{% url 'trainee_profile' %}">👥 حسابي</a>
+      {% if user.trainee_profile.batch %}
+        <div class="nav-section">عن البرنامج</div>
+        <div class="batch-widget">
+          <strong>{{ user.trainee_profile.batch.name }}</strong>
+          <p>{{ user.trainee_profile.batch.description|default:'برنامج تدريبي عملي على منصة أكاديميتي' }}</p>
+        </div>
+      {% endif %}
+    {% endif %}
+  </aside>
+
+  <main class="app">
+    <header class="topbar">
+      <div class="top-actions">
+        <span class="status-pill"><i class="status-dot"></i> متصل الآن</span>
+        <span class="user-pill"><span class="avatar">{% if user.is_staff %}إ{% else %}{{ user.trainee_profile.initials|default:user.username|slice:':1' }}{% endif %}</span><span>{{ user.first_name|default:user.username }}<br><small style="color:var(--muted)">{% if user.is_staff %}مدير النظام{% else %}متدرب{% endif %}</small></span></span>
+      </div>
+      <form method="post" action="{% url 'logout' %}">{% csrf_token %}<button class="logout" type="submit">خروج ↪</button></form>
+    </header>
+    <section class="content">
+      {% block content %}{% endblock %}
+    </section>
+  </main>
+  {% include 'attendance/messages.html' %}
+  <script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>

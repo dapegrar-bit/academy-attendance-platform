@@ -1,0 +1,64 @@
+{% load static %}
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>تسجيل الدخول | أكاديميتي</title>
+  <link rel="stylesheet" href="{% static 'css/app.css' %}">
+</head>
+<body class="auth-body">
+  <div class="auth-card">
+    <div class="auth-logo">
+      <img src="{% if brand.logo_url %}{{ brand.logo_url }}{% else %}{% static 'img/logo.svg' %}{% endif %}" alt="أكاديميتي">
+      <div class="pill">النظام الشامل للحضور والمحاضرات</div>
+    </div>
+
+    <div class="tabs">
+      <button type="button" class="tab-btn {% if active_tab != 'register' %}active{% endif %}" data-tab="login-tab">تسجيل الدخول</button>
+      <button type="button" class="tab-btn {% if active_tab == 'register' %}active{% endif %}" data-tab="register-tab">حساب جديد</button>
+    </div>
+
+    <div id="login-tab" class="tab-pane {% if active_tab != 'register' %}active{% endif %}">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="login">
+        <div class="field">
+          <label>اسم المستخدم</label>
+          {{ login_form.username }}
+          {{ login_form.username.errors }}
+        </div>
+        <div class="field">
+          <label>كلمة المرور</label>
+          {{ login_form.password }}
+          {{ login_form.password.errors }}
+        </div>
+        <button class="btn btn-block" type="submit">دخول إلى حسابي</button>
+      </form>
+    </div>
+
+    <div id="register-tab" class="tab-pane {% if active_tab == 'register' %}active{% endif %}">
+      <form method="post">
+        {% csrf_token %}
+        <input type="hidden" name="action" value="register">
+        {% for field in register_form %}
+          <div class="field">
+            <label>{{ field.label }}</label>
+            {{ field }}
+            {{ field.errors }}
+          </div>
+        {% endfor %}
+        <button class="btn btn-block" type="submit">إنشاء الحساب والدخول</button>
+      </form>
+    </div>
+
+    <div class="help-box" style="margin-top:18px">
+      <strong>للتجربة السريعة:</strong><br>
+      إدارة <code>admin / admin123</code><br>
+      متدرب <code>sara / 1234</code>
+    </div>
+  </div>
+  {% include 'attendance/messages.html' %}
+  <script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>

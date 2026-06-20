@@ -1,0 +1,11 @@
+{% extends 'attendance/base.html' %}
+{% block title %}إعدادات النظام{% endblock %}
+{% block content %}
+<div class="page-head"><div class="page-title"><h1>إعدادات النظام</h1><p>تعديل اسم الأكاديمية والشعار والألوان الأساسية</p></div></div>
+<div class="card" style="max-width:760px">
+  <form method="post">{% csrf_token %}
+    {% for field in form %}<div class="field"><label>{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}
+    <button class="btn">حفظ الإعدادات</button>
+  </form>
+</div>
+{% endblock %}

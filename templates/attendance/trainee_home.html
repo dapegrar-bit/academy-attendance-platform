@@ -1,0 +1,32 @@
+{% extends 'attendance/base.html' %}
+{% block title %}الرئيسية | المتدرب{% endblock %}
+{% block content %}
+<div class="page-head"><div class="page-title"><h1>مساء الخير {{ profile.full_name|cut:' '|slice:':8' }} 👋</h1><p>اليوم {{ today }} — لوحة تحضيرك اليومية</p></div><span class="badge {% if profile.attendance_rate == 0 %}absent{% endif %}">نسبة حضورك {{ profile.attendance_rate }}%</span></div>
+<div class="grid grid-3">
+  <div class="card stat-card"><div class="stat-icon">✓</div><div><div class="stat-value">{{ profile.present_count }}</div><div class="stat-label">محاضرة حضرتها</div></div></div>
+  <div class="card stat-card"><div class="stat-icon" style="color:var(--accent)">▣</div><div><div class="stat-value">{{ total_sessions }}</div><div class="stat-label">إجمالي المحاضرات حتى الآن</div></div></div>
+  <div class="card stat-card"><div class="stat-icon">♙</div><div><div class="stat-value">{{ profile.attendance_rate }}%</div><div class="stat-label">نسبة الالتزام العامة</div></div><div class="progress"><span style="width:{{ profile.attendance_rate }}%"></span></div></div>
+</div>
+<div class="card hero-attendance" style="margin-top:18px">
+  {% if todays_session %}
+    {% if record %}
+      <div>
+        <div class="checked-circle">✓<br>تم التحضير</div>
+        <h2>سجلت حضورك في {{ todays_session.title }}</h2>
+        <p class="muted">وقت التحضير: {{ record.checked_at|date:'H:i' }}</p>
+        <div class="zoom-box"><span class="muted">رابط محاضرة اليوم</span><a class="btn" href="{{ zoom_url }}" target="_blank" rel="noopener">فتح الزووم ▣</a><span>{{ zoom_url|truncatechars:42 }}</span></div>
+      </div>
+    {% else %}
+      <form method="post" action="{% url 'check_in' todays_session.id %}">{% csrf_token %}
+        <button class="pulse-button" type="submit">⌁<br>تحضير الآن</button>
+        <h2>اضغط على الزر لتسجيل حضورك في محاضرة {{ todays_session.title }}</h2>
+        <p class="muted">بعد التحضير سيظهر لك رابط الزووم مباشرة</p>
+        <p class="muted">دفعة: {{ profile.batch.name }} • {{ todays_session.date }} {% if todays_session.start_time %}• {{ todays_session.start_time }}{% endif %}</p>
+      </form>
+    {% endif %}
+  {% else %}
+    <div class="empty"><div><div class="icon">▣</div><h2>لا توجد محاضرة فعالة اليوم</h2><p>سيظهر زر التحضير عند إضافة الإدارة لمحاضرة اليوم.</p></div></div>
+  {% endif %}
+</div>
+{% if announcements %}<div class="card" style="margin-top:18px"><h2>تنبيهات</h2>{% for a in announcements %}<div class="about-card"><strong>{{ a.title }}</strong><p class="muted">{{ a.body }}</p></div>{% endfor %}</div>{% endif %}
+{% endblock %}

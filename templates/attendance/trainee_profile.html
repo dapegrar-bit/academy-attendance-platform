@@ -1,0 +1,9 @@
+{% extends 'attendance/base.html' %}
+{% block title %}حسابي{% endblock %}
+{% block content %}
+<div class="page-head"><div class="page-title"><h1>حسابي</h1><p>بياناتك الشخصية وإعدادات الحساب</p></div></div>
+<div class="account-grid">
+  <div class="card"><h2>البيانات الشخصية</h2><form method="post">{% csrf_token %}<input type="hidden" name="form_type" value="profile">{% for field in profile_form %}<div class="field"><label>{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}<button class="btn btn-block">حفظ التعديلات</button></form></div>
+  <div class="card"><h2>تغيير كلمة المرور</h2><form method="post">{% csrf_token %}<input type="hidden" name="form_type" value="password">{% for field in password_form %}<div class="field"><label>{{ field.label }}</label>{{ field }}{{ field.errors }}</div>{% endfor %}<button class="btn btn-block btn-soft">تحديث كلمة المرور</button></form></div>
+</div>
+{% endblock %}
