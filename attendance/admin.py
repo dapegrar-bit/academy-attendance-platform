@@ -1,5 +1,15 @@
 from django.contrib import admin
-from .models import Batch, TraineeProfile, Session, TraineeZoomLink, AttendanceRecord, Announcement, SiteSetting, Notification
+from .models import (
+    Batch,
+    TraineeProfile,
+    Session,
+    TraineeZoomLink,
+    AttendanceRecord,
+    InstantCheckinRecord,
+    Announcement,
+    SiteSetting,
+    Notification,
+)
 
 
 @admin.register(Batch)
@@ -52,3 +62,10 @@ class NotificationAdmin(admin.ModelAdmin):
     list_display = ('title', 'recipient', 'session', 'is_read', 'created_at')
     search_fields = ('title', 'body', 'recipient__username', 'recipient__first_name')
     list_filter = ('is_read', 'created_at')
+
+
+@admin.register(InstantCheckinRecord)
+class InstantCheckinRecordAdmin(admin.ModelAdmin):
+    list_display = ('trainee', 'session', 'instant_sent_at', 'checked_at')
+    search_fields = ('trainee__full_name', 'trainee__user__username', 'session__title')
+    list_filter = ('session__batch', 'session__date')

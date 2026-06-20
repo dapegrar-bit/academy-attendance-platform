@@ -185,6 +185,32 @@ class AttendanceRecord(models.Model):
         return f'{self.trainee} - {self.session} - {self.get_status_display()}'
 
 
+class InstantCheckinRecord(models.Model):
+    """سجل مستقل للحضور الفجائي؛ يسمح بتسجيل حضور فجائي جديد حتى لو كان حضور المحاضرة الأساسي مسجلًا مسبقًا."""
+    trainee = models.ForeignKey(TraineeProfile, on_delete=models.CASCADE, related_name='instant_checkin_records', verbose_name='المتدرب')
+    session = models.ForeignKey(Session, on_delete=models.CASCADE, related_name='instant_checkin_records', verbose_name='المحاضرة')
+    instant_sent_at = models.DateTimeField('وقت إرسال طلب الحضور الفجائي')
+    checked_at = models.DateTimeField('وقت تسجيل الحضور الفجائي', default=timezone.now)
+    zoom_url_snapshot = models.URLField('الرابط المستخدم', max_length=500, blank=True)
+    ip_address = models.GenericIPAddressField('عنوان IP', null=True, blank=True)
+    user_agent = models.TextField('المتصفح والجهاز', blank=True)
+
+    class Meta:
+        verbose_name = 'سجل حضور فجائي'
+        verbose_name_plural = 'سجلات الحضور الفجائي'
+        unique_together = ('trainee', 'session', 'instant_sent_at')
+        ordering = ['-checked_at']
+        indexes = [
+            models.Index(fields=['trainee', 'session']),
+            models.Index(fields=['session', 'instant_sent_at']),
+            models.Index(fields=['checked_at']),
+        ]
+
+    def __str__(self):
+        return f'حضور فجائي - {self.trainee} - {self.session}'
+
+
+
 class Notification(models.Model):
     recipient = models.ForeignKey(User, on_delete=models.CASCADE, related_name='platform_notifications', verbose_name='المستلم')
     title = models.CharField('العنوان', max_length=180)

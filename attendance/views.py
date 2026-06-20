@@ -35,6 +35,7 @@ from .models import (
     Session,
     TraineeProfile,
     AttendanceRecord,
+    InstantCheckinRecord,
     Announcement,
     TraineeZoomLink,
     SiteSetting,
@@ -600,13 +601,26 @@ def poll_notifications(request):
 
     attended_ids = set(AttendanceRecord.objects.filter(trainee=profile).values_list('session_id', flat=True))
 
+    def has_current_instant_record(session):
+        if not session or not session.instant_checkin_enabled or not session.instant_checkin_sent_at:
+            return False
+        return InstantCheckinRecord.objects.filter(
+            trainee=profile,
+            session=session,
+            instant_sent_at=session.instant_checkin_sent_at,
+        ).exists()
+
     items = []
     for n in qs.order_by('created_at')[:10]:
         checkin_url = ''
         can_checkin = False
-        if n.session and n.session.batch_id == profile.batch_id and n.session_id not in attended_ids and n.session.checkin_is_open:
-            can_checkin = True
-            checkin_url = reverse('check_in', args=[n.session_id])
+        if n.session and n.session.batch_id == profile.batch_id:
+            if n.session.instant_checkin_enabled and not has_current_instant_record(n.session):
+                can_checkin = True
+                checkin_url = reverse('check_in', args=[n.session_id]) + '?instant=1'
+            elif n.session_id not in attended_ids and n.session.checkin_is_open:
+                can_checkin = True
+                checkin_url = reverse('check_in', args=[n.session_id])
         items.append({
             'id': n.id,
             'title': n.title,
@@ -621,17 +635,18 @@ def poll_notifications(request):
     if profile.batch_id:
         instant_sessions = (
             Session.objects.filter(batch=profile.batch, is_active=True, instant_checkin_enabled=True)
-            .exclude(attendance_records__trainee=profile)
-            .order_by('date', 'start_time', 'id')[:8]
+            .order_by('date', 'start_time', 'id')[:20]
         )
         for session in instant_sessions:
+            if has_current_instant_record(session):
+                continue
             open_checkins.append({
                 'id': session.id,
                 'title': session.title,
                 'date': session.date.strftime('%Y-%m-%d'),
                 'time': session.start_time.strftime('%H:%M') if session.start_time else '',
-                'message': session.checkin_message,
-                'checkin_url': reverse('check_in', args=[session.id]),
+                'message': 'حضور فجائي جديد متاح الآن حتى لو كان حضورك الأساسي مسجلًا.',
+                'checkin_url': reverse('check_in', args=[session.id]) + '?instant=1',
             })
 
     return JsonResponse({
@@ -715,6 +730,45 @@ def check_in(request, session_id):
         return redirect('admin_overview')
     profile = get_profile(request.user)
     session = get_object_or_404(Session, pk=session_id, batch=profile.batch, is_active=True)
+    is_instant_request = request.GET.get('instant') == '1' or request.POST.get('instant') == '1'
+
+    custom = TraineeZoomLink.objects.filter(session=session, trainee=profile).first()
+    zoom_url = custom.zoom_url if custom else session.zoom_url
+
+    if is_instant_request or session.instant_checkin_enabled:
+        if not session.instant_checkin_enabled or not session.instant_checkin_sent_at:
+            messages.error(request, 'الحضور الفجائي غير متاح الآن لهذه المحاضرة.')
+            return redirect('trainee_home')
+
+        instant_record, created = InstantCheckinRecord.objects.get_or_create(
+            trainee=profile,
+            session=session,
+            instant_sent_at=session.instant_checkin_sent_at,
+            defaults={
+                'zoom_url_snapshot': zoom_url,
+                'ip_address': get_client_ip(request),
+                'user_agent': request.META.get('HTTP_USER_AGENT', '')[:1000],
+            }
+        )
+
+        # إذا لم يكن الحضور الأساسي مسجلًا، نسجله أيضًا حتى تبقى نسبة الحضور صحيحة.
+        AttendanceRecord.objects.get_or_create(
+            trainee=profile,
+            session=session,
+            defaults={
+                'status': 'present',
+                'zoom_url_snapshot': zoom_url,
+                'ip_address': get_client_ip(request),
+                'user_agent': request.META.get('HTTP_USER_AGENT', '')[:1000],
+            }
+        )
+
+        if created:
+            messages.success(request, 'تم تسجيل حضورك الفجائي بنجاح')
+        else:
+            messages.info(request, 'تم تسجيل حضورك الفجائي لهذا الطلب مسبقًا.')
+        return redirect('trainee_home')
+
     existing = AttendanceRecord.objects.filter(trainee=profile, session=session).first()
     if existing:
         messages.info(request, 'حضورك لهذه المحاضرة مسجل مسبقًا.')
@@ -722,8 +776,6 @@ def check_in(request, session_id):
     if not session.checkin_is_open:
         messages.error(request, session.checkin_message)
         return redirect('trainee_home')
-    custom = TraineeZoomLink.objects.filter(session=session, trainee=profile).first()
-    zoom_url = custom.zoom_url if custom else session.zoom_url
     AttendanceRecord.objects.create(
         trainee=profile,
         session=session,
